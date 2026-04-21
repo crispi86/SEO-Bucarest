@@ -14,8 +14,9 @@ function graphqlRequest(query, variables = {}) {
       res.on('end', () => {
         try {
           const parsed = JSON.parse(data);
-          if (parsed.errors?.length) {
-            const msg = parsed.errors.map(e => e.message).join('; ');
+          if (parsed.errors) {
+            const errs = Array.isArray(parsed.errors) ? parsed.errors : [parsed.errors];
+            const msg = errs.map(e => (typeof e === 'string' ? e : (e.message || JSON.stringify(e)))).join('; ');
             console.error('GraphQL errors:', msg);
             return reject(new Error('GraphQL: ' + msg));
           }
