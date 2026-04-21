@@ -11,7 +11,17 @@ function graphqlRequest(query, variables = {}) {
     }, res => {
       let data = '';
       res.on('data', c => data += c);
-      res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.errors?.length) {
+            const msg = parsed.errors.map(e => e.message).join('; ');
+            console.error('GraphQL errors:', msg);
+            return reject(new Error('GraphQL: ' + msg));
+          }
+          resolve(parsed);
+        } catch(e) { reject(e); }
+      });
     });
     req.on('error', reject);
     req.write(body); req.end();
