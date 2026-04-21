@@ -540,12 +540,6 @@ async function init() {
     const sel = document.getElementById(id);
     cols.forEach(c => { const o = document.createElement('option'); o.value=c.id; o.textContent=c.title; sel.appendChild(o); });
   });
-  // Load metaobject types
-  try {
-    const types = await fetch('/api/metaobjects/types').then(r=>r.json());
-    const moSel = document.getElementById('mo-type');
-    types.forEach(t => { const o = document.createElement('option'); o.value=t.type; o.textContent=t.name||t.type; moSel.appendChild(o); });
-  } catch {}
 }
 
 // ── Navigation ────────────────────────────────────────────────────────────────
@@ -555,6 +549,7 @@ function showPage(name, btn) {
   document.getElementById('page-'+name).classList.add('active');
   btn.classList.add('active');
   if (name==='history') loadHistory();
+  if (name==='metaobjects') loadMetaobjectTypes();
 }
 
 // ── Shared utils ──────────────────────────────────────────────────────────────
@@ -725,6 +720,36 @@ function renderCollTable() {
 }
 
 // ── Metaobjects ───────────────────────────────────────────────────────────────
+let moTypesLoaded = false;
+async function loadMetaobjectTypes() {
+  if (moTypesLoaded) return;
+  const sel = document.getElementById('mo-type');
+  sel.disabled = true;
+  const hint = document.getElementById('mo-hint');
+  if (hint) hint.textContent = 'Cargando tipos…';
+  try {
+    const types = await fetch('/api/metaobjects/types').then(r => r.json());
+    sel.innerHTML = '<option value="">Seleccione tipo…</option>';
+    if (!types.length) {
+      sel.innerHTML = '<option value="">Sin metaobjetos definidos</option>';
+      if (hint) hint.textContent = 'No se encontraron tipos de metaobjetos';
+    } else {
+      types.forEach(t => {
+        const o = document.createElement('option');
+        o.value = t.type; o.textContent = t.name || t.type;
+        sel.appendChild(o);
+      });
+      if (hint) hint.textContent = types.length + ' tipo(s) disponible(s)';
+      moTypesLoaded = true;
+    }
+  } catch(e) {
+    sel.innerHTML = '<option value="">Error al cargar — reintente</option>';
+    if (hint) hint.textContent = 'Error: ' + e.message;
+    moTypesLoaded = false;
+  }
+  sel.disabled = false;
+}
+
 async function loadMetaobjects() {
   const type=document.getElementById('mo-type').value; if(!type) return;
   const load=document.getElementById('mo-loading'); load.style.display='block'; document.getElementById('mo-list').innerHTML=''; sections.metaobjects.items=[];
