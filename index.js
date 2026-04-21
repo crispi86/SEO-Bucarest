@@ -881,8 +881,8 @@ const nameMap = { products:'p_item', collections:'c_item', metaobjects:'mo_item'
 async function startGen(type) {
   const prefix = typeMap[type];
   const checkboxes = Array.from(document.querySelectorAll('[name="'+nameMap[type]+'"]:checked'));
-  const items = checkboxes.map(c => JSON.parse(c.dataset.obj));
-  if (!items.length) return;
+  const allItems = checkboxes.map(c => JSON.parse(c.dataset.obj));
+  if (!allItems.length) return;
 
   sections[type].results = [];
   document.getElementById(prefix+'-rtbody').innerHTML='';
@@ -891,31 +891,53 @@ async function startGen(type) {
   document.getElementById(prefix+'-gen-btn').disabled=true;
   if(document.getElementById(prefix+'-msg')) document.getElementById(prefix+'-msg').style.display='none';
 
-  try {
-    const {jobId} = await fetch('/api/seo/queue',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,items})}).then(r=>r.json());
-    const es = new EventSource('/api/seo/stream/'+jobId);
-    es.onmessage = e => {
-      const data = JSON.parse(e.data);
-      if (data.done) {
+  const BATCH = 20;
+  const total = allItems.length;
+  let done = 0;
+
+  for (let b = 0; b < allItems.length; b += BATCH) {
+    const chunk = allItems.slice(b, b + BATCH);
+    const ok = await runChunk(type, prefix, chunk, done, total);
+    if (!ok) return;
+    done += chunk.length;
+  }
+
+  document.getElementById(prefix+'-prog').style.display='none';
+  document.getElementById(prefix+'-gen-btn').disabled=false;
+  afterSelChange(prefix);
+  showGenResults(type);
+}
+
+function runChunk(type, prefix, items, offset, total) {
+  return new Promise(async resolve => {
+    try {
+      const {jobId} = await fetch('/api/seo/queue',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,items})}).then(r=>r.json());
+      const es = new EventSource('/api/seo/stream/'+jobId);
+      es.onmessage = e => {
+        const data = JSON.parse(e.data);
+        if (data.done) { es.close(); resolve(true); return; }
+        updateProg(prefix, offset + data.index, total);
+        if (!data.error) { sections[type].results.push({...data, approved:true}); appendResult(type, data, sections[type].results.length-1); }
+        else { appendErrResult(prefix, data); }
+        updateApplyCount(prefix, sections[type].results);
+      };
+      es.onerror = () => {
         es.close();
         document.getElementById(prefix+'-prog').style.display='none';
         document.getElementById(prefix+'-gen-btn').disabled=false;
         afterSelChange(prefix);
-        showGenResults(type);
-        return;
-      }
-      updateProg(prefix, data.index, data.total);
-      if (!data.error) { sections[type].results.push({...data, approved:true}); appendResult(type, data, sections[type].results.length-1); }
-      else { appendErrResult(prefix, data); }
-      updateApplyCount(prefix, sections[type].results);
-    };
-    es.onerror = () => { es.close(); document.getElementById(prefix+'-prog').style.display='none'; document.getElementById(prefix+'-gen-btn').disabled=false; afterSelChange(prefix); showSectionMsg(prefix,'Error en la generación.','err'); };
-  } catch(e) {
-    document.getElementById(prefix+'-prog').style.display='none';
-    document.getElementById(prefix+'-gen-btn').disabled=false;
-    afterSelChange(prefix);
-    showSectionMsg(prefix,'Error: '+e.message,'err');
-  }
+        if (sections[type].results.length) showGenResults(type);
+        showSectionMsg(prefix,'Error en la generación. Se guardaron '+sections[type].results.length+' resultado(s).','err');
+        resolve(false);
+      };
+    } catch(e) {
+      document.getElementById(prefix+'-prog').style.display='none';
+      document.getElementById(prefix+'-gen-btn').disabled=false;
+      afterSelChange(prefix);
+      showSectionMsg(prefix,'Error: '+e.message,'err');
+      resolve(false);
+    }
+  });
 }
 
 function updateProg(prefix, idx, total) {
