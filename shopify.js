@@ -37,7 +37,7 @@ function restRequest(method, path, body = null) {
 // ── PRODUCTS ──────────────────────────────────────────────────────────────────
 
 const PRODUCT_FIELDS = `
-  id handle title descriptionHtml tags vendor productType status
+  id handle title descriptionHtml tags vendor productType status totalInventory
   variants(first: 1) { edges { node { sku price } } }
   seo { title description }
 `;
@@ -54,6 +54,7 @@ function mapProduct(node) {
     productType: node.productType || '',
     status: (node.status || 'draft').toLowerCase(),
     sku: node.variants?.edges?.[0]?.node?.sku || '',
+    totalInventory: node.totalInventory ?? 0,
     currentMetaTitle: node.seo?.title || '',
     currentMetaDescription: node.seo?.description || '',
   };

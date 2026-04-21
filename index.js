@@ -343,10 +343,33 @@ function adminUI(host) {
     <div id="pf-tag" class="filter-panel"><label>Tag<input id="p-tag" placeholder="Ej: pintura" oninput="debounce(loadProducts,600)"></label></div>
     <div id="pf-title" class="filter-panel"><label>Título contiene<input id="p-title" placeholder="Ej: silla" oninput="debounce(loadProducts,600)"></label></div>
     <div id="p-loading" class="empty-msg" style="display:none">Cargando…</div>
-    <div class="seo-filter" id="p-seo-filter" style="display:none">
-      <button class="seo-filter-btn active" onclick="setPSeoFilter('all',this)">Todos</button>
-      <button class="seo-filter-btn" onclick="setPSeoFilter('done',this)">Con SEO</button>
-      <button class="seo-filter-btn" onclick="setPSeoFilter('none',this)">Sin SEO</button>
+    <div id="p-extra-filters" style="display:none">
+      <div style="display:flex;gap:24px;flex-wrap:wrap;margin:10px 0;padding:10px 0;border-top:1px solid #f0ece6">
+        <div>
+          <div style="font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:#aaa;margin-bottom:6px">SEO</div>
+          <div class="seo-filter" id="p-seo-filter">
+            <button class="seo-filter-btn active" onclick="setPSeoFilter('all',this)">Todos</button>
+            <button class="seo-filter-btn" onclick="setPSeoFilter('done',this)">Con SEO</button>
+            <button class="seo-filter-btn" onclick="setPSeoFilter('none',this)">Sin SEO</button>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:#aaa;margin-bottom:6px">Estado</div>
+          <div class="seo-filter" id="p-status-filter">
+            <button class="seo-filter-btn active" onclick="setPStatusFilter('all',this)">Todos</button>
+            <button class="seo-filter-btn" onclick="setPStatusFilter('active',this)">Activo</button>
+            <button class="seo-filter-btn" onclick="setPStatusFilter('draft',this)">Borrador</button>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:#aaa;margin-bottom:6px">Existencias</div>
+          <div class="seo-filter" id="p-stock-filter">
+            <button class="seo-filter-btn active" onclick="setPStockFilter('all',this)">Todos</button>
+            <button class="seo-filter-btn" onclick="setPStockFilter('available',this)">Disponible</button>
+            <button class="seo-filter-btn" onclick="setPStockFilter('soldout',this)">Sin stock</button>
+          </div>
+        </div>
+      </div>
     </div>
     <div id="p-list"></div>
     <div class="sel-row"><span class="sel-count" id="p-count"></span><button class="sel-all-btn" id="p-selall" onclick="selAll('p')" style="display:none">Seleccionar todos</button></div>
@@ -479,7 +502,7 @@ function adminUI(host) {
 <script>
 // ── State ─────────────────────────────────────────────────────────────────────
 const sections = {
-  products:    { prefix:'p',   items:[], results:[], seoFilter:'all' },
+  products:    { prefix:'p',   items:[], results:[], seoFilter:'all', statusFilter:'all', stockFilter:'all' },
   collections: { prefix:'c',   items:[], results:[] },
   metaobjects: { prefix:'mo',  items:[], results:[] },
   articles:    { prefix:'art', items:[], results:[] },
@@ -582,13 +605,27 @@ function setPF(type, btn) {
   document.querySelectorAll('#pf-filters .filter-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
   document.querySelectorAll('[id^="pf-"]').forEach(p=>p.classList.remove('active'));
   document.getElementById('pf-'+type).classList.add('active');
-  sections.products.items=[]; document.getElementById('p-list').innerHTML=''; document.getElementById('p-count').textContent=''; document.getElementById('p-selall').style.display='none'; document.getElementById('p-seo-filter').style.display='none';
+  sections.products.items=[]; sections.products.seoFilter='all'; sections.products.statusFilter='all'; sections.products.stockFilter='all';
+  document.getElementById('p-list').innerHTML=''; document.getElementById('p-count').textContent=''; document.getElementById('p-selall').style.display='none'; document.getElementById('p-extra-filters').style.display='none';
+  ['p-seo-filter','p-status-filter','p-stock-filter'].forEach(id => document.querySelectorAll('#'+id+' .seo-filter-btn').forEach((b,i)=>{b.classList.toggle('active',i===0);}));
   afterSelChange('p');
 }
 
 function setPSeoFilter(f, btn) {
   sections.products.seoFilter = f;
-  document.querySelectorAll('.seo-filter-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
+  document.querySelectorAll('#p-seo-filter .seo-filter-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
+  renderProductTable(sections.products.items);
+}
+
+function setPStatusFilter(f, btn) {
+  sections.products.statusFilter = f;
+  document.querySelectorAll('#p-status-filter .seo-filter-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
+  renderProductTable(sections.products.items);
+}
+
+function setPStockFilter(f, btn) {
+  sections.products.stockFilter = f;
+  document.querySelectorAll('#p-stock-filter .seo-filter-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
   renderProductTable(sections.products.items);
 }
 
@@ -604,13 +641,18 @@ async function loadProducts() {
 }
 
 function renderProductTable(products) {
-  const f = sections.products.seoFilter;
-  const filtered = f==='done' ? products.filter(p=>processedIds.products.has(p.id))
-                 : f==='none' ? products.filter(p=>!processedIds.products.has(p.id))
-                 : products;
+  const { seoFilter, statusFilter, stockFilter } = sections.products;
+  let filtered = products;
+  if (seoFilter === 'done')   filtered = filtered.filter(p => processedIds.products.has(p.id));
+  else if (seoFilter === 'none') filtered = filtered.filter(p => !processedIds.products.has(p.id));
+  if (statusFilter === 'active') filtered = filtered.filter(p => p.status === 'active');
+  else if (statusFilter === 'draft') filtered = filtered.filter(p => p.status !== 'active');
+  if (stockFilter === 'available') filtered = filtered.filter(p => p.totalInventory > 0);
+  else if (stockFilter === 'soldout') filtered = filtered.filter(p => p.totalInventory <= 0);
+
   const list=document.getElementById('p-list');
-  const sfBtn=document.getElementById('p-seo-filter');
-  if(sfBtn) sfBtn.style.display=products.length?'flex':'none';
+  const extraFilters=document.getElementById('p-extra-filters');
+  if(extraFilters) extraFilters.style.display=products.length?'block':'none';
   if(!filtered.length){list.innerHTML='<p class="empty-msg">No hay productos en este filtro.</p>';document.getElementById('p-selall').style.display='none';afterSelChange('p');return;}
   list.innerHTML=\`<table class="tbl"><thead><tr><th style="width:30px"></th><th style="width:30px">SEO</th><th>Título</th><th>SKU</th><th>URL</th><th>Meta desc.</th><th>Estado</th></tr></thead><tbody>
     \${filtered.map(p=>\`<tr onclick="toggleRow(this,'p')">
