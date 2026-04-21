@@ -16,8 +16,8 @@
 const https = require('https');
 
 const DEPRECIATION_FACTOR = 1.08; // +8% para cubrir comisión PayPal
-const SHOP = process.env.SHOPIFY_SHOP;
-const TOKEN = process.env.SHOPIFY_ACCESS_TOKEN;
+const SHOP = (process.env.SHOPIFY_SHOP || '').trim();
+const TOKEN = (process.env.SHOPIFY_ACCESS_TOKEN || '').trim();
 
 function get(url) {
   return new Promise((resolve, reject) => {
