@@ -394,6 +394,10 @@ function adminUI(host) {
   <div class="card">
     <button class="btn btn-secondary" onclick="loadCollectionsSEO()" style="margin-bottom:14px">Cargar colecciones</button>
     <div id="c-loading" class="empty-msg" style="display:none">Cargando…</div>
+    <div id="c-seo-filter" style="display:none;margin:10px 0 4px;padding-top:10px;border-top:1px solid #f0ece6">
+      <div style="font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:#aaa;margin-bottom:6px">SEO</div>
+      <div class="seo-filter"><button class="seo-filter-btn active" onclick="setSeoFilter('collections','all',this)">Todos</button><button class="seo-filter-btn" onclick="setSeoFilter('collections','done',this)">Con SEO</button><button class="seo-filter-btn" onclick="setSeoFilter('collections','none',this)">Sin SEO</button></div>
+    </div>
     <div id="c-list"></div>
     <div class="sel-row"><span class="sel-count" id="c-count"></span><button class="sel-all-btn" id="c-selall" onclick="selAll('c')" style="display:none">Seleccionar todos</button></div>
   </div>
@@ -417,6 +421,10 @@ function adminUI(host) {
   <div class="card">
     <label style="margin-bottom:14px">Tipo de metaobjeto<select id="mo-type" onchange="loadMetaobjects()"><option value="">Seleccione tipo…</option></select></label>
     <div id="mo-loading" class="empty-msg" style="display:none">Cargando…</div>
+    <div id="mo-seo-filter" style="display:none;margin:10px 0 4px;padding-top:10px;border-top:1px solid #f0ece6">
+      <div style="font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:#aaa;margin-bottom:6px">SEO</div>
+      <div class="seo-filter"><button class="seo-filter-btn active" onclick="setSeoFilter('metaobjects','all',this)">Todos</button><button class="seo-filter-btn" onclick="setSeoFilter('metaobjects','done',this)">Con SEO</button><button class="seo-filter-btn" onclick="setSeoFilter('metaobjects','none',this)">Sin SEO</button></div>
+    </div>
     <div id="mo-list"></div>
     <div class="sel-row"><span class="sel-count" id="mo-count"></span><button class="sel-all-btn" id="mo-selall" onclick="selAll('mo')" style="display:none">Seleccionar todos</button></div>
   </div>
@@ -443,6 +451,10 @@ function adminUI(host) {
       <button class="btn btn-secondary" onclick="loadArticles()" style="white-space:nowrap;padding:9px 16px">Cargar todos</button>
     </div>
     <div id="art-loading" class="empty-msg" style="display:none">Cargando…</div>
+    <div id="art-seo-filter" style="display:none;margin:10px 0 4px;padding-top:10px;border-top:1px solid #f0ece6">
+      <div style="font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:#aaa;margin-bottom:6px">SEO</div>
+      <div class="seo-filter"><button class="seo-filter-btn active" onclick="setSeoFilter('articles','all',this)">Todos</button><button class="seo-filter-btn" onclick="setSeoFilter('articles','done',this)">Con SEO</button><button class="seo-filter-btn" onclick="setSeoFilter('articles','none',this)">Sin SEO</button></div>
+    </div>
     <div id="art-list"></div>
     <div class="sel-row"><span class="sel-count" id="art-count"></span><button class="sel-all-btn" id="art-selall" onclick="selAll('art')" style="display:none">Seleccionar todos</button></div>
   </div>
@@ -474,6 +486,10 @@ function adminUI(host) {
     <div id="imgf-tag" class="filter-panel"><label>Tag<input id="img-tag" placeholder="Ej: pintura" oninput="debounce(loadImages,600)"></label></div>
     <div id="imgf-title" class="filter-panel"><label>Título<input id="img-title" placeholder="Ej: óleo" oninput="debounce(loadImages,600)"></label></div>
     <div id="img-loading" class="empty-msg" style="display:none">Cargando imágenes…</div>
+    <div id="img-seo-filter" style="display:none;margin:10px 0 4px;padding-top:10px;border-top:1px solid #f0ece6">
+      <div style="font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:#aaa;margin-bottom:6px">Alt text</div>
+      <div class="seo-filter"><button class="seo-filter-btn active" onclick="setSeoFilter('images','all',this)">Todos</button><button class="seo-filter-btn" onclick="setSeoFilter('images','done',this)">Con alt</button><button class="seo-filter-btn" onclick="setSeoFilter('images','none',this)">Sin alt</button></div>
+    </div>
     <div id="img-list"></div>
     <div class="sel-row"><span class="sel-count" id="img-count"></span><button class="sel-all-btn" id="img-selall" onclick="selAll('img')" style="display:none">Seleccionar todas</button></div>
   </div>
@@ -503,10 +519,10 @@ function adminUI(host) {
 // ── State ─────────────────────────────────────────────────────────────────────
 const sections = {
   products:    { prefix:'p',   items:[], results:[], seoFilter:'all', statusFilter:'all', stockFilter:'all' },
-  collections: { prefix:'c',   items:[], results:[] },
-  metaobjects: { prefix:'mo',  items:[], results:[] },
-  articles:    { prefix:'art', items:[], results:[] },
-  images:      { prefix:'img', items:[], results:[] },
+  collections: { prefix:'c',   items:[], results:[], seoFilter:'all' },
+  metaobjects: { prefix:'mo',  items:[], results:[], seoFilter:'all' },
+  articles:    { prefix:'art', items:[], results:[], seoFilter:'all' },
+  images:      { prefix:'img', items:[], results:[], seoFilter:'all' },
 };
 let processedIds = { products:new Set(), collections:new Set(), metaobjects:new Set(), articles:new Set(), images:new Set() };
 let pFilterType = 'collection';
@@ -617,6 +633,16 @@ function setPSeoFilter(f, btn) {
   renderProductTable(sections.products.items);
 }
 
+function setSeoFilter(type, f, btn) {
+  sections[type].seoFilter = f;
+  const prefix = typeMap[type];
+  document.querySelectorAll('#'+prefix+'-seo-filter .seo-filter-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
+  if (type==='collections') renderCollTable();
+  else if (type==='metaobjects') renderMOTable();
+  else if (type==='articles') renderArtTable();
+  else if (type==='images') renderImgTable();
+}
+
 function setPStatusFilter(f, btn) {
   sections.products.statusFilter = f;
   document.querySelectorAll('#p-status-filter .seo-filter-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
@@ -677,9 +703,13 @@ async function loadCollectionsSEO() {
 }
 
 function renderCollTable() {
-  const items=sections.collections.items;
+  const f=sections.collections.seoFilter;
+  const sf=document.getElementById('c-seo-filter'); if(sf) sf.style.display=sections.collections.items.length?'block':'none';
+  const items = f==='done' ? sections.collections.items.filter(c=>processedIds.collections.has(c.id))
+              : f==='none' ? sections.collections.items.filter(c=>!processedIds.collections.has(c.id))
+              : sections.collections.items;
   const list=document.getElementById('c-list');
-  if(!items.length){list.innerHTML='<p class="empty-msg">No hay colecciones.</p>';document.getElementById('c-selall').style.display='none';afterSelChange('c');return;}
+  if(!items.length){list.innerHTML='<p class="empty-msg">No hay colecciones en este filtro.</p>';document.getElementById('c-selall').style.display='none';afterSelChange('c');return;}
   list.innerHTML=\`<table class="tbl"><thead><tr><th style="width:30px"></th><th style="width:30px">SEO</th><th>Colección</th><th>URL</th><th>Meta título</th><th>Meta desc.</th></tr></thead><tbody>
     \${items.map(c=>\`<tr onclick="toggleRow(this,'c')">
       <td><input type="checkbox" name="c_item" value="\${c.id}" data-obj='\${esc(JSON.stringify(c))}' onchange="afterSelChange('c');event.stopPropagation()"></td>
@@ -703,8 +733,13 @@ async function loadMetaobjects() {
 }
 
 function renderMOTable() {
-  const items=sections.metaobjects.items; const list=document.getElementById('mo-list');
-  if(!items.length){list.innerHTML='<p class="empty-msg">No hay metaobjetos.</p>';afterSelChange('mo');return;}
+  const f=sections.metaobjects.seoFilter;
+  const sf=document.getElementById('mo-seo-filter'); if(sf) sf.style.display=sections.metaobjects.items.length?'block':'none';
+  const items = f==='done' ? sections.metaobjects.items.filter(m=>processedIds.metaobjects.has(m.id))
+              : f==='none' ? sections.metaobjects.items.filter(m=>!processedIds.metaobjects.has(m.id))
+              : sections.metaobjects.items;
+  const list=document.getElementById('mo-list');
+  if(!items.length){list.innerHTML='<p class="empty-msg">No hay metaobjetos en este filtro.</p>';afterSelChange('mo');return;}
   list.innerHTML=\`<table class="tbl"><thead><tr><th style="width:30px"></th><th style="width:30px">SEO</th><th>Nombre</th><th>Meta título</th></tr></thead><tbody>
     \${items.map(m=>\`<tr onclick="toggleRow(this,'mo')">
       <td><input type="checkbox" name="mo_item" value="\${m.id}" data-obj='\${esc(JSON.stringify(m))}' onchange="afterSelChange('mo');event.stopPropagation()"></td>
@@ -726,8 +761,13 @@ async function loadArticles() {
 }
 
 function renderArtTable() {
-  const items=sections.articles.items; const list=document.getElementById('art-list');
-  if(!items.length){list.innerHTML='<p class="empty-msg">No hay artículos.</p>';afterSelChange('art');return;}
+  const f=sections.articles.seoFilter;
+  const sf=document.getElementById('art-seo-filter'); if(sf) sf.style.display=sections.articles.items.length?'block':'none';
+  const items = f==='done' ? sections.articles.items.filter(a=>processedIds.articles.has(a.id))
+              : f==='none' ? sections.articles.items.filter(a=>!processedIds.articles.has(a.id))
+              : sections.articles.items;
+  const list=document.getElementById('art-list');
+  if(!items.length){list.innerHTML='<p class="empty-msg">No hay artículos en este filtro.</p>';afterSelChange('art');return;}
   list.innerHTML=\`<table class="tbl"><thead><tr><th style="width:30px"></th><th style="width:30px">SEO</th><th>Artículo</th><th>Blog</th><th>Meta título</th><th>Meta desc.</th></tr></thead><tbody>
     \${items.map(a=>\`<tr onclick="toggleRow(this,'art')">
       <td><input type="checkbox" name="art_item" value="\${a.id}" data-obj='\${esc(JSON.stringify(a))}' onchange="afterSelChange('art');event.stopPropagation()"></td>
@@ -763,8 +803,13 @@ async function loadImages() {
 }
 
 function renderImgTable() {
-  const items=sections.images.items; const list=document.getElementById('img-list');
-  if(!items.length){list.innerHTML='<p class="empty-msg">No hay imágenes.</p>';afterSelChange('img');return;}
+  const f=sections.images.seoFilter;
+  const sf=document.getElementById('img-seo-filter'); if(sf) sf.style.display=sections.images.items.length?'block':'none';
+  const items = f==='done' ? sections.images.items.filter(i=>processedIds.images.has(i.id))
+              : f==='none' ? sections.images.items.filter(i=>!processedIds.images.has(i.id) && !i.currentAlt)
+              : sections.images.items;
+  const list=document.getElementById('img-list');
+  if(!items.length){list.innerHTML='<p class="empty-msg">No hay imágenes en este filtro.</p>';afterSelChange('img');return;}
   list.innerHTML=\`<table class="tbl"><thead><tr><th style="width:30px"></th><th style="width:30px">SEO</th><th>Imagen</th><th>Producto</th><th>Alt actual</th></tr></thead><tbody>
     \${items.map(img=>\`<tr onclick="toggleRow(this,'img')">
       <td><input type="checkbox" name="img_item" value="\${img.id}" data-obj='\${esc(JSON.stringify(img))}' onchange="afterSelChange('img');event.stopPropagation()"></td>
