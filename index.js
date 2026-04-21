@@ -84,7 +84,7 @@ app.get('/api/products', async (req, res) => {
 
 // ── API: Collections with SEO ─────────────────────────────────────────────────
 app.get('/api/collections/seo', async (req, res) => {
-  try { res.json(await shopify.getCollectionsWithSEO(100)); }
+  try { res.json(await shopify.getCollectionsWithSEO(250)); }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 

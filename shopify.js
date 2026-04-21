@@ -116,7 +116,7 @@ async function getCollections() {
     .sort((a, b) => a.title.localeCompare(b.title));
 }
 
-async function getCollectionsWithSEO(limit = 100, after = null) {
+async function getCollectionsWithSEO(limit = 250, after = null) {
   const afterClause = after ? `, after: "${after}"` : '';
   const result = await graphqlRequest(`{
     collections(first: ${limit}${afterClause}) {
