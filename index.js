@@ -152,10 +152,12 @@ app.get('/api/seo/stream/:jobId', async (req, res) => {
   res.flushHeaders();
 
   const send = data => res.write(`data: ${JSON.stringify(data)}\n\n`);
+  const ping = () => res.write(`: keepalive\n\n`);
   const { type, items } = job;
 
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
+    ping();
     try {
       let result;
       if (type === 'products') result = await seo.generateSEO(item);
@@ -167,7 +169,7 @@ app.get('/api/seo/stream/:jobId', async (req, res) => {
     } catch (e) {
       send({ error: e.message, itemTitle: item.productTitle || item.collectionTitle || item.metaobjectTitle || item.articleTitle || item.productTitle || '(sin nombre)', index: i + 1, total: items.length });
     }
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise(r => setTimeout(r, 100));
   }
 
   send({ done: true });
