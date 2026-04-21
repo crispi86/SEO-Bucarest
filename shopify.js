@@ -163,9 +163,10 @@ async function updateCollectionSEO(collectionGid, metaTitle, metaDescription) {
 async function getMetaobjectTypes() {
   const result = await graphqlRequest(`{
     metaobjectDefinitions(first: 50) {
-      edges { node { id type name fieldDefinitions { key name } } }
+      edges { node { id type name } }
     }
   }`);
+  console.log('getMetaobjectTypes raw:', JSON.stringify(result?.data), 'errors:', JSON.stringify(result?.errors));
   return (result?.data?.metaobjectDefinitions?.edges || []).map(e => ({
     id: e.node.id, type: e.node.type, name: e.node.name,
   }));

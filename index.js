@@ -90,7 +90,11 @@ app.get('/api/collections/seo', async (req, res) => {
 
 // ── API: Metaobjects ──────────────────────────────────────────────────────────
 app.get('/api/metaobjects/types', async (req, res) => {
-  try { res.json(await shopify.getMetaobjectTypes()); }
+  try {
+    const types = await shopify.getMetaobjectTypes();
+    console.log('Metaobject types:', JSON.stringify(types));
+    res.json(types);
+  }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
