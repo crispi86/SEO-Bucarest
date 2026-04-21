@@ -5,6 +5,7 @@ process.on('unhandledRejection', err => console.error('UNHANDLED:', err));
 const express = require('express');
 const crypto = require('crypto');
 const fs = require('fs');
+// crypto se mantiene para generar jobIds
 const shopify = require('./shopify');
 const { generateSEO } = require('./seo');
 
@@ -13,52 +14,13 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
-const pendingStates = new Map();
-const authorizedShops = new Set();
-
 function requireAuth(req, res, next) {
-  const shop = req.query.shop || process.env.SHOPIFY_SHOP;
-  if (authorizedShops.has(shop)) return next();
-  const host = req.query.host || '';
-  const authUrl = `/shopify/auth?shop=${encodeURIComponent(shop)}&host=${encodeURIComponent(host)}`;
-  res.send(`<!DOCTYPE html><html><head>
-    <script>window.top.location.href = ${JSON.stringify(authUrl)};</script>
-  </head><body></body></html>`);
+  const shop = req.query.shop || '';
+  if (!shop || shop === process.env.SHOPIFY_SHOP) return next();
+  res.status(403).send('Acceso denegado');
 }
 
 app.get('/', (req, res) => res.send('Bucarest SEO Manager — OK'));
-
-app.get('/shopify/auth', (req, res) => {
-  const shop = req.query.shop || process.env.SHOPIFY_SHOP;
-  const state = crypto.randomBytes(16).toString('hex');
-  pendingStates.set(state, req.query.host || '');
-  const params = new URLSearchParams({
-    client_id: process.env.SHOPIFY_API_KEY,
-    scope: 'read_products,write_products,read_metaobjects,write_metaobjects',
-    redirect_uri: `${process.env.APP_URL}/auth/callback`,
-    state,
-  });
-  const authUrl = `https://${shop}/admin/oauth/authorize?${params}`;
-  res.send(`<!DOCTYPE html><html><head>
-    <script>window.top.location.href = ${JSON.stringify(authUrl)};</script>
-  </head><body></body></html>`);
-});
-
-app.get('/auth/callback', async (req, res) => {
-  const { shop, code, state, hmac } = req.query;
-  if (!pendingStates.has(state)) return res.status(403).send('Estado inválido');
-  const savedHost = pendingStates.get(state);
-  pendingStates.delete(state);
-
-  const { hmac: _h, ...rest } = req.query;
-  const message = Object.keys(rest).sort().map(k => `${k}=${rest[k]}`).join('&');
-  const digest = crypto.createHmac('sha256', process.env.SHOPIFY_API_SECRET).update(message).digest('hex');
-  if (digest !== hmac) return res.status(403).send('HMAC inválido');
-
-  authorizedShops.add(shop);
-  const host = savedHost || Buffer.from(`${shop}/admin`).toString('base64');
-  res.redirect(`/admin?shop=${encodeURIComponent(shop)}&host=${encodeURIComponent(host)}`);
-});
 
 // ── Admin UI ──────────────────────────────────────────────────────────────────
 app.get('/admin', requireAuth, (req, res) => {
