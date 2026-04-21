@@ -95,8 +95,14 @@ app.get('/api/products', async (req, res) => {
 
 // ── API: Collections with SEO ─────────────────────────────────────────────────
 app.get('/api/collections/seo', async (req, res) => {
-  try { res.json(await shopify.getCollectionsWithSEO(250)); }
-  catch (e) { res.status(500).json({ error: e.message }); }
+  try {
+    const result = await shopify.getCollectionsWithSEO(250);
+    console.log(`collections/seo: ${result.collections?.length ?? 0} collections returned`);
+    res.json(result);
+  } catch (e) {
+    console.error('collections/seo error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ── API: Metaobjects ──────────────────────────────────────────────────────────
@@ -751,8 +757,19 @@ function renderProductTable(products) {
 // ── Collections ───────────────────────────────────────────────────────────────
 async function loadCollectionsSEO() {
   const load=document.getElementById('c-loading'); load.style.display='block'; document.getElementById('c-list').innerHTML=''; sections.collections.items=[];
-  try{const d=await fetch('/api/collections/seo').then(r=>r.json());sections.collections.items=d.collections||[];load.style.display='none';renderCollTable();}
-  catch(e){load.style.display='none';document.getElementById('c-list').innerHTML='<p class="empty-msg">Error cargando.</p>';}
+  try{
+    const r=await fetch('/api/collections/seo');
+    const d=await r.json();
+    if(d.error) throw new Error(d.error);
+    sections.collections.items=d.collections||[];
+    load.style.display='none';
+    if(!sections.collections.items.length) document.getElementById('c-list').innerHTML='<p class="empty-msg">La API devolvió 0 colecciones. Verifica credenciales Shopify.</p>';
+    else renderCollTable();
+  } catch(e){
+    console.error('loadCollectionsSEO error:',e);
+    load.style.display='none';
+    document.getElementById('c-list').innerHTML=\`<p class="empty-msg" style="color:#c0392b">Error: \${e.message}</p>\`;
+  }
 }
 
 function renderCollTable() {
