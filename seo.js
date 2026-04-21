@@ -26,7 +26,11 @@ async function callClaude(prompt) {
   return JSON.parse(match[0]);
 }
 
-async function generateSEO(product) {
+function extraBlock(extraRules) {
+  return extraRules ? `\nINSTRUCCIONES ADICIONALES (prioridad alta):\n${extraRules}` : '';
+}
+
+async function generateSEO(product, extraRules = '') {
   const tags = Array.isArray(product.tags) ? product.tags.join(', ') : (product.tags || '');
   const json = await callClaude(`${STORE_CONTEXT}
 
@@ -37,7 +41,7 @@ PRODUCTO:
 - Proveedor: ${product.vendor || '(sin datos)'}
 - Tags: ${tags || '(sin tags)'}
 
-${SEO_RULES}
+${SEO_RULES}${extraBlock(extraRules)}
 
 Responde SOLO con JSON: {"metaTitle":"...","metaDescription":"..."}`);
 
@@ -49,7 +53,7 @@ Responde SOLO con JSON: {"metaTitle":"...","metaDescription":"..."}`);
   };
 }
 
-async function generateCollectionSEO(collection) {
+async function generateCollectionSEO(collection, extraRules = '') {
   const json = await callClaude(`${STORE_CONTEXT}
 
 COLECCIÓN:
@@ -58,7 +62,7 @@ COLECCIÓN:
 
 Genera SEO para la página de esta colección de antigüedades. El comprador busca categorías generales.
 
-${SEO_RULES}
+${SEO_RULES}${extraBlock(extraRules)}
 
 Responde SOLO con JSON: {"metaTitle":"...","metaDescription":"..."}`);
 
@@ -70,7 +74,7 @@ Responde SOLO con JSON: {"metaTitle":"...","metaDescription":"..."}`);
   };
 }
 
-async function generateMetaobjectSEO(metaobject) {
+async function generateMetaobjectSEO(metaobject, extraRules = '') {
   const fieldsSummary = (metaobject.fields || []).slice(0, 6)
     .filter(f => f.value)
     .map(f => `${f.key}: ${String(f.value).substring(0, 100)}`)
@@ -84,7 +88,7 @@ METAOBJETO:
 
 Genera SEO descriptivo basado en el nombre y campos del objeto.
 
-${SEO_RULES}
+${SEO_RULES}${extraBlock(extraRules)}
 
 Responde SOLO con JSON: {"metaTitle":"...","metaDescription":"..."}`);
 
@@ -96,7 +100,7 @@ Responde SOLO con JSON: {"metaTitle":"...","metaDescription":"..."}`);
   };
 }
 
-async function generateArticleSEO(article) {
+async function generateArticleSEO(article, extraRules = '') {
   const tags = Array.isArray(article.tags) ? article.tags.join(', ') : (article.tags || '');
   const json = await callClaude(`${STORE_CONTEXT}
 
@@ -107,7 +111,7 @@ ARTÍCULO DE BLOG:
 
 Genera SEO para este artículo del blog de una tienda de antigüedades de lujo.
 
-${SEO_RULES}
+${SEO_RULES}${extraBlock(extraRules)}
 
 Responde SOLO con JSON: {"metaTitle":"...","metaDescription":"..."}`);
 
@@ -119,7 +123,8 @@ Responde SOLO con JSON: {"metaTitle":"...","metaDescription":"..."}`);
   };
 }
 
-async function generateAltText(image) {
+async function generateAltText(image, extraRules = '') {
+  const extra = extraRules ? `\nInstrucciones adicionales: ${extraRules}` : '';
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 120,
@@ -129,7 +134,7 @@ async function generateAltText(image) {
 Producto: ${image.productTitle}
 Tipo: ${image.productType || '(sin tipo)'}
 Proveedor/Autor: ${image.vendor || '(sin datos)'}
-Alt actual: ${image.currentAlt || '(vacío)'}
+Alt actual: ${image.currentAlt || '(vacío)'}${extra}
 
 Responde SOLO con el texto del alt, sin comillas ni explicaciones. Idioma: español.`,
     }],
