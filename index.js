@@ -342,6 +342,12 @@ function adminUI(host) {
       <button class="filter-btn active" onclick="setPF('collection',this)">Por colección</button>
       <button class="filter-btn" onclick="setPF('tag',this)">Por tag</button>
       <button class="filter-btn" onclick="setPF('title',this)">Por título</button>
+      <span style="color:#e8e2d9;margin:0 4px;align-self:center">|</span>
+      <div id="p-seo-filter-top" style="display:flex;gap:6px;align-items:center">
+        <button class="seo-filter-btn active" data-f="all" onclick="setPSeoFilter('all',this)">Todos</button>
+        <button class="seo-filter-btn" data-f="done" onclick="setPSeoFilter('done',this)">Con SEO</button>
+        <button class="seo-filter-btn" data-f="none" onclick="setPSeoFilter('none',this)">Sin SEO</button>
+      </div>
     </div>
     <div id="pf-collection" class="filter-panel active"><label>Colección<select id="p-col" onchange="loadProducts()"><option value="">Seleccione…</option></select></label></div>
     <div id="pf-tag" class="filter-panel"><label>Tag<input id="p-tag" placeholder="Ej: pintura" oninput="debounce(loadProducts,600)"></label></div>
@@ -352,9 +358,9 @@ function adminUI(host) {
         <div>
           <div style="font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:#aaa;margin-bottom:6px">SEO</div>
           <div class="seo-filter" id="p-seo-filter">
-            <button class="seo-filter-btn active" onclick="setPSeoFilter('all',this)">Todos</button>
-            <button class="seo-filter-btn" onclick="setPSeoFilter('done',this)">Con SEO</button>
-            <button class="seo-filter-btn" onclick="setPSeoFilter('none',this)">Sin SEO</button>
+            <button class="seo-filter-btn active" data-f="all" onclick="setPSeoFilter('all',this)">Todos</button>
+            <button class="seo-filter-btn" data-f="done" onclick="setPSeoFilter('done',this)">Con SEO</button>
+            <button class="seo-filter-btn" data-f="none" onclick="setPSeoFilter('none',this)">Sin SEO</button>
           </div>
         </div>
         <div>
@@ -479,12 +485,22 @@ function adminUI(host) {
 <div class="page" id="page-images">
   <h1>Imágenes</h1>
   <p class="subtitle">Genera alt text optimizado para Google Images — muy valioso para pinturas y piezas únicas.</p>
+  <div style="background:#fdfbf7;border:1px solid #e8dfd0;border-left:3px solid #c9a96e;padding:12px 16px;margin-bottom:16px;font-size:12px;color:#7a6240">
+    <strong style="display:block;margin-bottom:3px;font-size:11px;letter-spacing:0.08em;text-transform:uppercase">Formato del alt text</strong>
+    El alt text se genera con el formato: <em>Título del producto — Vendor/Autor</em>. Esto optimiza la visibilidad en Google Images para pinturas y piezas únicas.
+  </div>
   <div class="card">
     <span class="section-label">Filtrar productos</span>
     <div class="filter-row" id="imgf-filters">
       <button class="filter-btn active" onclick="setImgF('collection',this)">Por colección</button>
       <button class="filter-btn" onclick="setImgF('tag',this)">Por tag</button>
       <button class="filter-btn" onclick="setImgF('title',this)">Por título</button>
+      <span style="color:#e8e2d9;margin:0 4px;align-self:center">|</span>
+      <div id="img-seo-filter-top" style="display:flex;gap:6px;align-items:center">
+        <button class="seo-filter-btn active" data-f="all" onclick="setSeoFilter('images','all',this)">Todos</button>
+        <button class="seo-filter-btn" data-f="done" onclick="setSeoFilter('images','done',this)">Con alt</button>
+        <button class="seo-filter-btn" data-f="none" onclick="setSeoFilter('images','none',this)">Sin alt</button>
+      </div>
     </div>
     <div id="imgf-collection" class="filter-panel active"><label>Colección<select id="img-col" onchange="loadImages()"><option value="">Seleccione…</option></select></label></div>
     <div id="imgf-tag" class="filter-panel"><label>Tag<input id="img-tag" placeholder="Ej: pintura" oninput="debounce(loadImages,600)"></label></div>
@@ -492,7 +508,7 @@ function adminUI(host) {
     <div id="img-loading" class="empty-msg" style="display:none">Cargando imágenes…</div>
     <div id="img-seo-filter" style="display:none;margin:10px 0 4px;padding-top:10px;border-top:1px solid #f0ece6">
       <div style="font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:#aaa;margin-bottom:6px">Alt text</div>
-      <div class="seo-filter"><button class="seo-filter-btn active" onclick="setSeoFilter('images','all',this)">Todos</button><button class="seo-filter-btn" onclick="setSeoFilter('images','done',this)">Con alt</button><button class="seo-filter-btn" onclick="setSeoFilter('images','none',this)">Sin alt</button></div>
+      <div class="seo-filter"><button class="seo-filter-btn active" data-f="all" onclick="setSeoFilter('images','all',this)">Todos</button><button class="seo-filter-btn" data-f="done" onclick="setSeoFilter('images','done',this)">Con alt</button><button class="seo-filter-btn" data-f="none" onclick="setSeoFilter('images','none',this)">Sin alt</button></div>
     </div>
     <div id="img-list"></div>
     <div class="sel-row"><span class="sel-count" id="img-count"></span><button class="sel-all-btn" id="img-selall" onclick="selAll('img')" style="display:none">Seleccionar todas</button></div>
@@ -622,20 +638,24 @@ function setPF(type, btn) {
   document.getElementById('pf-'+type).classList.add('active');
   sections.products.items=[]; sections.products.seoFilter='all'; sections.products.statusFilter='all'; sections.products.stockFilter='all';
   document.getElementById('p-list').innerHTML=''; document.getElementById('p-count').textContent=''; document.getElementById('p-selall').style.display='none'; document.getElementById('p-extra-filters').style.display='none';
-  ['p-seo-filter','p-status-filter','p-stock-filter'].forEach(id => document.querySelectorAll('#'+id+' .seo-filter-btn').forEach((b,i)=>{b.classList.toggle('active',i===0);}));
+  document.querySelectorAll('#p-seo-filter .seo-filter-btn, #p-seo-filter-top .seo-filter-btn').forEach(b => b.classList.toggle('active', b.dataset.f === 'all'));
+  ['p-status-filter','p-stock-filter'].forEach(id => document.querySelectorAll('#'+id+' .seo-filter-btn').forEach((b,i)=>{b.classList.toggle('active',i===0);}));
   afterSelChange('p');
 }
 
 function setPSeoFilter(f, btn) {
   sections.products.seoFilter = f;
-  document.querySelectorAll('#p-seo-filter .seo-filter-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
+  document.querySelectorAll('#p-seo-filter .seo-filter-btn, #p-seo-filter-top .seo-filter-btn')
+    .forEach(b => b.classList.toggle('active', b.dataset.f === f));
   renderProductTable(sections.products.items);
 }
 
 function setSeoFilter(type, f, btn) {
   sections[type].seoFilter = f;
   const prefix = typeMap[type];
-  document.querySelectorAll('#'+prefix+'-seo-filter .seo-filter-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
+  document.querySelectorAll('#'+prefix+'-seo-filter .seo-filter-btn').forEach(b => b.classList.toggle('active', b.dataset.f === f));
+  const topEl = document.getElementById(prefix+'-seo-filter-top');
+  if (topEl) topEl.querySelectorAll('.seo-filter-btn').forEach(b => b.classList.toggle('active', b.dataset.f === f));
   if (type==='collections') renderCollTable();
   else if (type==='metaobjects') renderMOTable();
   else if (type==='articles') renderArtTable();
