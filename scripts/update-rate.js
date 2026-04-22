@@ -21,12 +21,40 @@ const TOKEN = (process.env.SHOPIFY_ACCESS_TOKEN || '').trim();
 
 function get(url) {
   return new Promise((resolve, reject) => {
-    https.get(url, { headers: { 'User-Agent': 'bucarest-rate-updater/1.0' } }, res => {
+    https.get(url, { headers: { 'User-Agent': 'bucarest-rate-updater/1.0', 'Accept': 'application/json' } }, res => {
+      console.log(`GET ${url} → HTTP ${res.statusCode}`);
+      // seguir redirecciones
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        return get(res.headers.location).then(resolve).catch(reject);
+      }
       let data = '';
       res.on('data', c => data += c);
-      res.on('end', () => { try { resolve(JSON.parse(data)); } catch (e) { reject(e); } });
+      res.on('end', () => {
+        console.log('Respuesta raw:', data.substring(0, 200));
+        try { resolve(JSON.parse(data)); } catch (e) { reject(new Error(`JSON inválido: ${e.message} — body: ${data.substring(0, 100)}`)); }
+      });
     }).on('error', reject);
   });
+}
+
+async function fetchRate() {
+  const apis = [
+    { url: 'https://api.frankfurter.app/latest?from=USD&to=CLP', extract: d => d?.rates?.CLP },
+    { url: 'https://open.er-api.com/v6/latest/USD', extract: d => d?.rates?.CLP },
+    { url: 'https://api.exchangerate-api.com/v4/latest/USD', extract: d => d?.rates?.CLP },
+  ];
+  for (const api of apis) {
+    try {
+      console.log(`Intentando: ${api.url}`);
+      const data = await get(api.url);
+      const rate = api.extract(data);
+      if (rate && rate > 0) { console.log(`Éxito con ${api.url}`); return rate; }
+      console.log(`Respuesta sin tasa CLP:`, JSON.stringify(data).substring(0, 200));
+    } catch (e) {
+      console.log(`Falló ${api.url}: ${e.message}`);
+    }
+  }
+  throw new Error('Todos los APIs de tipo de cambio fallaron');
 }
 
 function graphql(query, variables = {}) {
@@ -90,9 +118,7 @@ async function main() {
   let clpPerUsd;
 
   try {
-    const data = await get('https://api.frankfurter.app/latest?from=USD&to=CLP');
-    clpPerUsd = data?.rates?.CLP;
-    if (!clpPerUsd || clpPerUsd <= 0) throw new Error('Respuesta inválida: ' + JSON.stringify(data));
+    clpPerUsd = await fetchRate();
     console.log(`Tipo de cambio de mercado: 1 USD = ${clpPerUsd} CLP`);
   } catch (e) {
     console.error('Error al obtener tipo de cambio:', e.message);
