@@ -19,27 +19,26 @@ const RATE_ADJUSTMENT = 50; // restar N pesos al tipo de cambio de mercado
 const SHOP = (process.env.SHOPIFY_SHOP || '').trim();
 const TOKEN = (process.env.SHOPIFY_ACCESS_TOKEN || '').trim();
 
-function get(url) {
+function get(url, timeout = 10000) {
   return new Promise((resolve, reject) => {
-    https.get(url, { headers: { 'User-Agent': 'bucarest-rate-updater/1.0', 'Accept': 'application/json' } }, res => {
+    const req = https.get(url, { headers: { 'User-Agent': 'bucarest-rate-updater/1.0', 'Accept': 'application/json' } }, res => {
       console.log(`GET ${url} → HTTP ${res.statusCode}`);
-      // seguir redirecciones
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        return get(res.headers.location).then(resolve).catch(reject);
+        return get(res.headers.location, timeout).then(resolve).catch(reject);
       }
       let data = '';
       res.on('data', c => data += c);
       res.on('end', () => {
-        console.log('Respuesta raw:', data.substring(0, 200));
-        try { resolve(JSON.parse(data)); } catch (e) { reject(new Error(`JSON inválido: ${e.message} — body: ${data.substring(0, 100)}`)); }
+        try { resolve(JSON.parse(data)); } catch (e) { reject(new Error(`JSON inválido — body: ${data.substring(0, 100)}`)); }
       });
-    }).on('error', reject);
+    });
+    req.setTimeout(timeout, () => { req.destroy(); reject(new Error(`Timeout (${timeout}ms)`)); });
+    req.on('error', reject);
   });
 }
 
 async function fetchRate() {
   const apis = [
-    { url: 'https://api.frankfurter.app/latest?from=USD&to=CLP', extract: d => d?.rates?.CLP },
     { url: 'https://open.er-api.com/v6/latest/USD', extract: d => d?.rates?.CLP },
     { url: 'https://api.exchangerate-api.com/v4/latest/USD', extract: d => d?.rates?.CLP },
   ];
