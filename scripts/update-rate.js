@@ -15,7 +15,7 @@
 
 const https = require('https');
 
-const DEPRECIATION_FACTOR = 1.08; // +8% para cubrir comisión PayPal
+const RATE_ADJUSTMENT = 50; // restar N pesos al tipo de cambio de mercado
 const SHOP = (process.env.SHOPIFY_SHOP || '').trim();
 const TOKEN = (process.env.SHOPIFY_ACCESS_TOKEN || '').trim();
 
@@ -131,8 +131,8 @@ async function main() {
     process.exit(0);
   }
 
-  const adjustedRate = clpPerUsd / DEPRECIATION_FACTOR;
-  console.log(`Factor de depreciación: ${DEPRECIATION_FACTOR} → tasa ajustada: ${adjustedRate.toFixed(4)} CLP/USD`);
+  const adjustedRate = clpPerUsd - RATE_ADJUSTMENT;
+  console.log(`Ajuste: ${clpPerUsd} - ${RATE_ADJUSTMENT} = ${adjustedRate.toFixed(4)} CLP/USD`);
 
   const shopId = await getShopId();
   if (!shopId) throw new Error('No se pudo obtener el ID de la tienda');
