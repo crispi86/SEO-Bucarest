@@ -48,7 +48,7 @@ const processedIds = {
   images: new Set(store.processedIds?.images || []),
 };
 let history = store.history || [];
-let settings = { extraRules: '', ...(store.settings || {}) };
+let settings = { extraRules: '', rules: [], ...(store.settings || {}) };
 
 function saveStore() {
   const data = {
@@ -62,11 +62,21 @@ function saveStore() {
 app.get('/api/settings', (req, res) => res.json(settings));
 
 app.post('/api/settings', (req, res) => {
-  const { extraRules } = req.body;
-  settings.extraRules = (extraRules || '').trim();
+  const { extraRules, rules } = req.body;
+  if (extraRules !== undefined) settings.extraRules = (extraRules || '').trim();
+  if (Array.isArray(rules)) settings.rules = rules;
   saveStore();
   res.json({ ok: true });
 });
+
+function getRulesForType(type) {
+  const parts = [];
+  if (settings.extraRules) parts.push(settings.extraRules);
+  (settings.rules || []).forEach(r => {
+    if (r.type === 'general' || r.type === type) parts.push(r.text);
+  });
+  return parts.join('\n');
+}
 
 app.get('/api/processed-ids', (req, res) => {
   res.json(Object.fromEntries(Object.entries(processedIds).map(([k, v]) => [k, [...v]])));
@@ -177,11 +187,11 @@ app.get('/api/seo/stream/:jobId', async (req, res) => {
     ping();
     try {
       let result;
-      if (type === 'products') result = await seo.generateSEO(item, settings.extraRules);
-      else if (type === 'collections') result = await seo.generateCollectionSEO(item, settings.extraRules);
-      else if (type === 'metaobjects') result = await seo.generateMetaobjectSEO(item, settings.extraRules);
-      else if (type === 'articles') result = await seo.generateArticleSEO(item, settings.extraRules);
-      else if (type === 'images') result = { ...item, altText: await seo.generateAltText(item, settings.extraRules) };
+      if (type === 'products') result = await seo.generateSEO(item, getRulesForType('products'));
+      else if (type === 'collections') result = await seo.generateCollectionSEO(item, getRulesForType('collections'));
+      else if (type === 'metaobjects') result = await seo.generateMetaobjectSEO(item, getRulesForType('metaobjects'));
+      else if (type === 'articles') result = await seo.generateArticleSEO(item, getRulesForType('articles'));
+      else if (type === 'images') result = { ...item, altText: await seo.generateAltText(item, getRulesForType('images')) };
       send({ ...result, index: i + 1, total: items.length });
     } catch (e) {
       send({ error: e.message, itemTitle: item.productTitle || item.collectionTitle || item.metaobjectTitle || item.articleTitle || item.productTitle || '(sin nombre)', index: i + 1, total: items.length });
@@ -549,14 +559,36 @@ function adminUI(host) {
 <!-- CONFIGURACIÓN -->
 <div class="page" id="page-config">
   <h1>Configuración</h1>
-  <p class="subtitle">Instrucciones adicionales que Claude aplicará en todas las generaciones SEO.</p>
+  <p class="subtitle">Instrucciones adicionales que Claude aplicará según el tipo de contenido.</p>
   <div class="card">
-    <span class="section-label">Correcciones y reglas adicionales</span>
-    <p style="font-size:12px;color:#999;margin-bottom:14px">Escribe aquí cualquier instrucción que quieras que Claude siga siempre. Por ejemplo: "Nunca uses la palabra 'exclusivo'", "Siempre menciona que las piezas son únicas", "El tono debe ser más cercano".</p>
-    <textarea id="cfg-extra-rules" rows="8" style="width:100%;padding:10px 12px;border:1px solid #ddd6cc;background:#fdfcfb;font-size:13px;font-family:inherit;outline:none;color:#1a1a1a;resize:vertical;transition:border-color 0.2s" placeholder="Ej: Nunca uses tecnicismos en francés. Siempre menciona que las piezas son certificadas. El tono debe ser cálido pero elegante."></textarea>
-    <div class="btn-row">
-      <button class="btn btn-primary" onclick="saveConfig()">Guardar instrucciones</button>
+    <span class="section-label">Agregar regla</span>
+    <p style="font-size:12px;color:#999;margin-bottom:14px">Selecciona a qué sección aplica la regla y escribe la instrucción. Las reglas <strong>Generales</strong> aplican a todas las secciones.</p>
+    <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+      <div style="flex:0 0 180px">
+        <label>Aplica a<select id="cfg-rule-type" style="margin-top:5px">
+          <option value="general">General (todas)</option>
+          <option value="products">Productos</option>
+          <option value="collections">Colecciones</option>
+          <option value="metaobjects">Metaobjetos</option>
+          <option value="articles">Blog</option>
+          <option value="images">Imágenes</option>
+        </select></label>
+      </div>
+      <div style="flex:1;min-width:220px">
+        <label>Instrucción<textarea id="cfg-rule-text" rows="3" style="margin-top:5px;width:100%;padding:9px 12px;border:1px solid #ddd6cc;background:#fdfcfb;font-size:13px;font-family:inherit;outline:none;color:#1a1a1a;resize:vertical;transition:border-color 0.2s" placeholder="Ej: Nunca uses la palabra 'exclusivo'."></textarea></label>
+      </div>
+    </div>
+    <div class="btn-row" style="margin-top:10px">
+      <button class="btn btn-primary" onclick="addRule()">Agregar regla</button>
       <div id="cfg-msg"></div>
+    </div>
+  </div>
+  <div class="card" id="cfg-rules-card" style="margin-top:0;display:none">
+    <span class="section-label">Reglas guardadas</span>
+    <div id="cfg-rules-list"></div>
+    <div class="btn-row" style="margin-top:16px">
+      <button class="btn btn-primary" onclick="saveConfig()">Guardar cambios</button>
+      <div id="cfg-save-msg"></div>
     </div>
   </div>
   <div class="card" style="margin-top:0">
@@ -1077,19 +1109,60 @@ async function applyAll(type) {
 }
 
 // ── Config ────────────────────────────────────────────────────────────────────
+const CFG_TYPE_LABELS = { general:'General', products:'Productos', collections:'Colecciones', metaobjects:'Metaobjetos', articles:'Blog', images:'Imágenes' };
+let cfgRules = [];
+
 async function loadConfig() {
   try {
     const s = await fetch('/api/settings').then(r=>r.json());
-    document.getElementById('cfg-extra-rules').value = s.extraRules || '';
+    cfgRules = Array.isArray(s.rules) ? s.rules : [];
+    renderCfgRules();
   } catch(e) {}
 }
 
-async function saveConfig() {
-  const extraRules = document.getElementById('cfg-extra-rules').value;
+function addRule() {
+  const type = document.getElementById('cfg-rule-type').value;
+  const text = document.getElementById('cfg-rule-text').value.trim();
+  if (!text) return;
+  cfgRules.push({ type, text });
+  document.getElementById('cfg-rule-text').value = '';
+  renderCfgRules();
   const msg = document.getElementById('cfg-msg');
+  msg.className='msg ok'; msg.textContent='Regla agregada. Guarda los cambios para aplicarla.'; msg.style.display='block';
+  setTimeout(()=>msg.style.display='none', 4000);
+}
+
+function removeRule(idx) {
+  cfgRules.splice(idx, 1);
+  renderCfgRules();
+}
+
+function renderCfgRules() {
+  const card = document.getElementById('cfg-rules-card');
+  const list = document.getElementById('cfg-rules-list');
+  if (!cfgRules.length) { card.style.display='none'; return; }
+  card.style.display='block';
+  const order = ['general','products','collections','metaobjects','articles','images'];
+  const grouped = {};
+  cfgRules.forEach((r, i) => { if (!grouped[r.type]) grouped[r.type] = []; grouped[r.type].push({ ...r, idx: i }); });
+  list.innerHTML = order.filter(t => grouped[t]).map(t => \`
+    <div style="margin-bottom:16px">
+      <div style="font-size:9px;letter-spacing:0.15em;text-transform:uppercase;color:#9a7f5a;margin-bottom:8px;border-bottom:1px solid #f0ece6;padding-bottom:5px">\${CFG_TYPE_LABELS[t]||t}</div>
+      \${grouped[t].map(r => \`
+        <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid #faf8f5">
+          <div style="flex:1;font-size:13px;color:#333;line-height:1.5">\${esc(r.text)}</div>
+          <button onclick="removeRule(\${r.idx})" style="flex-shrink:0;background:none;border:1px solid #f5c0c0;color:#c0392b;font-size:10px;padding:3px 8px;cursor:pointer;font-family:inherit;letter-spacing:0.06em;text-transform:uppercase">Eliminar</button>
+        </div>
+      \`).join('')}
+    </div>
+  \`).join('');
+}
+
+async function saveConfig() {
+  const msg = document.getElementById('cfg-save-msg');
   try {
-    await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({extraRules})});
-    msg.className='msg ok'; msg.textContent='Instrucciones guardadas.'; msg.style.display='block';
+    await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rules:cfgRules})});
+    msg.className='msg ok'; msg.textContent='Cambios guardados.'; msg.style.display='block';
     setTimeout(()=>msg.style.display='none',4000);
   } catch(e) {
     msg.className='msg err'; msg.textContent='Error al guardar.'; msg.style.display='block';
