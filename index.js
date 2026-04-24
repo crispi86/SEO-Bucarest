@@ -299,7 +299,8 @@ function adminUI(host) {
     .tbl td input[type=checkbox]{width:15px;height:15px;accent-color:#9a7f5a;cursor:pointer}
     .status-badge{font-size:9px;letter-spacing:0.08em;text-transform:uppercase;padding:2px 6px;border-radius:10px;white-space:nowrap}
     .s-active{background:#e6f4ea;color:#2d6a2d}.s-draft{background:#f0f0f0;color:#888}
-    .seo-done{color:#2d6a2d;font-weight:600}.seo-none{color:#ddd}
+    .seo-badge-yes{display:inline-block;background:#e6f4ea;color:#2d6a2d;border:1px solid #b8d8bc;border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700}
+    .seo-badge-no{color:#e0dbd5;font-size:13px}
     .meta-ok{color:#2d6a2d}.meta-no{color:#ddd}
     .url-link{color:#9a7f5a;text-decoration:none;font-size:11px}.url-link:hover{text-decoration:underline}
     .thumb{width:40px;height:40px;object-fit:cover;border:1px solid #e8e2d9;border-radius:2px}
@@ -412,7 +413,7 @@ function adminUI(host) {
       </div>
     </div>
     <div id="p-list"></div>
-    <div class="sel-row"><span class="sel-count" id="p-count"></span><button class="sel-all-btn" id="p-selall" onclick="selAll('p')" style="display:none">Seleccionar todos</button></div>
+    <div class="sel-row"><span class="sel-count" id="p-count"></span><div style="display:flex;gap:8px"><button class="sel-all-btn" id="p-sel-noseo" onclick="selWithoutSEO('p','products')" style="display:none">Selec. sin SEO</button><button class="sel-all-btn" id="p-selall" onclick="selAll('p')" style="display:none">Seleccionar todos</button></div></div>
   </div>
   <div class="btn-row">
     <button class="btn btn-primary" id="p-gen-btn" onclick="startGen('products')" disabled>Generar SEO con Claude</button>
@@ -439,7 +440,7 @@ function adminUI(host) {
       <div class="seo-filter"><button class="seo-filter-btn active" onclick="setSeoFilter('collections','all',this)">Todos</button><button class="seo-filter-btn" onclick="setSeoFilter('collections','done',this)">Con SEO</button><button class="seo-filter-btn" onclick="setSeoFilter('collections','none',this)">Sin SEO</button></div>
     </div>
     <div id="c-list"></div>
-    <div class="sel-row"><span class="sel-count" id="c-count"></span><button class="sel-all-btn" id="c-selall" onclick="selAll('c')" style="display:none">Seleccionar todos</button></div>
+    <div class="sel-row"><span class="sel-count" id="c-count"></span><div style="display:flex;gap:8px"><button class="sel-all-btn" id="c-sel-noseo" onclick="selWithoutSEO('c','collections')" style="display:none">Selec. sin SEO</button><button class="sel-all-btn" id="c-selall" onclick="selAll('c')" style="display:none">Seleccionar todos</button></div></div>
   </div>
   <div class="btn-row">
     <button class="btn btn-primary" id="c-gen-btn" onclick="startGen('collections')" disabled>Generar SEO con Claude</button>
@@ -466,7 +467,7 @@ function adminUI(host) {
       <div class="seo-filter"><button class="seo-filter-btn active" onclick="setSeoFilter('metaobjects','all',this)">Todos</button><button class="seo-filter-btn" onclick="setSeoFilter('metaobjects','done',this)">Con SEO</button><button class="seo-filter-btn" onclick="setSeoFilter('metaobjects','none',this)">Sin SEO</button></div>
     </div>
     <div id="mo-list"></div>
-    <div class="sel-row"><span class="sel-count" id="mo-count"></span><button class="sel-all-btn" id="mo-selall" onclick="selAll('mo')" style="display:none">Seleccionar todos</button></div>
+    <div class="sel-row"><span class="sel-count" id="mo-count"></span><div style="display:flex;gap:8px"><button class="sel-all-btn" id="mo-sel-noseo" onclick="selWithoutSEO('mo','metaobjects')" style="display:none">Selec. sin SEO</button><button class="sel-all-btn" id="mo-selall" onclick="selAll('mo')" style="display:none">Seleccionar todos</button></div></div>
   </div>
   <div class="btn-row">
     <button class="btn btn-primary" id="mo-gen-btn" onclick="startGen('metaobjects')" disabled>Generar SEO con Claude</button>
@@ -496,7 +497,7 @@ function adminUI(host) {
       <div class="seo-filter"><button class="seo-filter-btn active" onclick="setSeoFilter('articles','all',this)">Todos</button><button class="seo-filter-btn" onclick="setSeoFilter('articles','done',this)">Con SEO</button><button class="seo-filter-btn" onclick="setSeoFilter('articles','none',this)">Sin SEO</button></div>
     </div>
     <div id="art-list"></div>
-    <div class="sel-row"><span class="sel-count" id="art-count"></span><button class="sel-all-btn" id="art-selall" onclick="selAll('art')" style="display:none">Seleccionar todos</button></div>
+    <div class="sel-row"><span class="sel-count" id="art-count"></span><div style="display:flex;gap:8px"><button class="sel-all-btn" id="art-sel-noseo" onclick="selWithoutSEO('art','articles')" style="display:none">Selec. sin SEO</button><button class="sel-all-btn" id="art-selall" onclick="selAll('art')" style="display:none">Seleccionar todos</button></div></div>
   </div>
   <div class="btn-row">
     <button class="btn btn-primary" id="art-gen-btn" onclick="startGen('articles')" disabled>Generar SEO con Claude</button>
@@ -541,7 +542,7 @@ function adminUI(host) {
       <div class="seo-filter"><button class="seo-filter-btn active" data-f="all" onclick="setSeoFilter('images','all',this)">Todos</button><button class="seo-filter-btn" data-f="done" onclick="setSeoFilter('images','done',this)">Con alt</button><button class="seo-filter-btn" data-f="none" onclick="setSeoFilter('images','none',this)">Sin alt</button></div>
     </div>
     <div id="img-list"></div>
-    <div class="sel-row"><span class="sel-count" id="img-count"></span><button class="sel-all-btn" id="img-selall" onclick="selAll('img')" style="display:none">Seleccionar todas</button></div>
+    <div class="sel-row"><span class="sel-count" id="img-count"></span><div style="display:flex;gap:8px"><button class="sel-all-btn" id="img-sel-noseo" onclick="selWithoutSEO('img','images')" style="display:none">Selec. sin SEO</button><button class="sel-all-btn" id="img-selall" onclick="selAll('img')" style="display:none">Seleccionar todas</button></div></div>
   </div>
   <div class="btn-row">
     <button class="btn btn-primary" id="img-gen-btn" onclick="startGen('images')" disabled>Generar alt text con Claude</button>
@@ -674,6 +675,12 @@ function selAll(prefix) {
   afterSelChange(prefix);
 }
 
+function selWithoutSEO(prefix, type) {
+  const all = document.querySelectorAll('[name="'+prefix+'_item"]');
+  all.forEach(cb => { cb.checked = !processedIds[type].has(cb.value); });
+  afterSelChange(prefix);
+}
+
 function toggleRow(tr, prefix) {
   const cb = tr.querySelector('input[type=checkbox]');
   cb.checked = !cb.checked;
@@ -709,7 +716,7 @@ function setPF(type, btn) {
   document.querySelectorAll('[id^="pf-"]').forEach(p=>p.classList.remove('active'));
   document.getElementById('pf-'+type).classList.add('active');
   sections.products.items=[]; sections.products.seoFilter='all'; sections.products.statusFilter='all'; sections.products.stockFilter='all';
-  document.getElementById('p-list').innerHTML=''; document.getElementById('p-count').textContent=''; document.getElementById('p-selall').style.display='none'; document.getElementById('p-extra-filters').style.display='none';
+  document.getElementById('p-list').innerHTML=''; document.getElementById('p-count').textContent=''; document.getElementById('p-selall').style.display='none'; document.getElementById('p-sel-noseo').style.display='none'; document.getElementById('p-extra-filters').style.display='none';
   document.querySelectorAll('#p-seo-filter .seo-filter-btn, #p-seo-filter-top .seo-filter-btn').forEach(b => b.classList.toggle('active', b.dataset.f === 'all'));
   ['p-status-filter','p-stock-filter'].forEach(id => document.querySelectorAll('#'+id+' .seo-filter-btn').forEach((b,i)=>{b.classList.toggle('active',i===0);}));
   afterSelChange('p');
@@ -770,11 +777,11 @@ function renderProductTable(products) {
   const list=document.getElementById('p-list');
   const extraFilters=document.getElementById('p-extra-filters');
   if(extraFilters) extraFilters.style.display=products.length?'block':'none';
-  if(!filtered.length){list.innerHTML='<p class="empty-msg">No hay productos en este filtro.</p>';document.getElementById('p-selall').style.display='none';afterSelChange('p');return;}
+  if(!filtered.length){list.innerHTML='<p class="empty-msg">No hay productos en este filtro.</p>';document.getElementById('p-selall').style.display='none';document.getElementById('p-sel-noseo').style.display='none';afterSelChange('p');return;}
   list.innerHTML=\`<table class="tbl"><thead><tr><th style="width:30px"></th><th style="width:30px">SEO</th><th>Título</th><th>SKU</th><th>URL</th><th>Meta desc.</th><th>Estado</th></tr></thead><tbody>
     \${filtered.map(p=>\`<tr onclick="toggleRow(this,'p')">
       <td><input type="checkbox" name="p_item" value="\${p.id}" data-gid="\${p.gid}" data-obj='\${esc(JSON.stringify(p))}' onchange="afterSelChange('p');event.stopPropagation()"></td>
-      <td class="\${processedIds.products.has(p.id)?'seo-done':'seo-none'}">\${processedIds.products.has(p.id)?'✓':'—'}</td>
+      <td>\${processedIds.products.has(p.id)?'<span class="seo-badge-yes">✓ SEO</span>':'<span class="seo-badge-no">—</span>'}</td>
       <td>\${esc(p.title)}</td>
       <td style="color:#aaa">\${esc(p.sku||'—')}</td>
       <td><a class="url-link" href="https://\${SHOP}.myshopify.com/products/\${p.handle}" target="_blank" onclick="event.stopPropagation()">/\${esc(p.handle)}</a></td>
@@ -783,6 +790,7 @@ function renderProductTable(products) {
     </tr>\`).join('')}
   </tbody></table>\`;
   document.getElementById('p-selall').style.display='block';
+  document.getElementById('p-sel-noseo').style.display='block';
   afterSelChange('p');
 }
 
@@ -811,11 +819,11 @@ function renderCollTable() {
               : f==='none' ? sections.collections.items.filter(c=>!processedIds.collections.has(c.id))
               : sections.collections.items;
   const list=document.getElementById('c-list');
-  if(!items.length){list.innerHTML='<p class="empty-msg">No hay colecciones en este filtro.</p>';document.getElementById('c-selall').style.display='none';afterSelChange('c');return;}
+  if(!items.length){list.innerHTML='<p class="empty-msg">No hay colecciones en este filtro.</p>';document.getElementById('c-selall').style.display='none';document.getElementById('c-sel-noseo').style.display='none';afterSelChange('c');return;}
   list.innerHTML=\`<table class="tbl"><thead><tr><th style="width:30px"></th><th style="width:30px">SEO</th><th>Colección</th><th>URL</th><th>Meta título</th><th>Meta desc.</th></tr></thead><tbody>
     \${items.map(c=>\`<tr onclick="toggleRow(this,'c')">
       <td><input type="checkbox" name="c_item" value="\${c.id}" data-obj='\${esc(JSON.stringify(c))}' onchange="afterSelChange('c');event.stopPropagation()"></td>
-      <td class="\${processedIds.collections.has(c.id)?'seo-done':'seo-none'}">\${processedIds.collections.has(c.id)?'✓':'—'}</td>
+      <td>\${processedIds.collections.has(c.id)?'<span class="seo-badge-yes">✓ SEO</span>':'<span class="seo-badge-no">—</span>'}</td>
       <td>\${esc(c.title)}</td>
       <td><a class="url-link" href="https://\${SHOP}.myshopify.com/collections/\${c.handle}" target="_blank" onclick="event.stopPropagation()">/collections/\${esc(c.handle)}</a></td>
       <td class="\${c.currentMetaTitle?'meta-ok':'meta-no'}">\${c.currentMetaTitle?'✓':'✗'}</td>
@@ -823,6 +831,7 @@ function renderCollTable() {
     </tr>\`).join('')}
   </tbody></table>\`;
   document.getElementById('c-selall').style.display='block';
+  document.getElementById('c-sel-noseo').style.display='block';
   afterSelChange('c');
 }
 
@@ -875,12 +884,13 @@ function renderMOTable() {
   list.innerHTML=\`<table class="tbl"><thead><tr><th style="width:30px"></th><th style="width:30px">SEO</th><th>Nombre</th><th>Meta título</th></tr></thead><tbody>
     \${items.map(m=>\`<tr onclick="toggleRow(this,'mo')">
       <td><input type="checkbox" name="mo_item" value="\${m.id}" data-obj='\${esc(JSON.stringify(m))}' onchange="afterSelChange('mo');event.stopPropagation()"></td>
-      <td class="\${processedIds.metaobjects.has(m.id)?'seo-done':'seo-none'}">\${processedIds.metaobjects.has(m.id)?'✓':'—'}</td>
+      <td>\${processedIds.metaobjects.has(m.id)?'<span class="seo-badge-yes">✓ SEO</span>':'<span class="seo-badge-no">—</span>'}</td>
       <td>\${esc(m.displayName)}</td>
       <td class="\${m.currentMetaTitle?'meta-ok':'meta-no'}">\${m.currentMetaTitle?'✓':'✗'}</td>
     </tr>\`).join('')}
   </tbody></table>\`;
   document.getElementById('mo-selall').style.display='block';
+  document.getElementById('mo-sel-noseo').style.display='block';
   afterSelChange('mo');
 }
 
@@ -903,7 +913,7 @@ function renderArtTable() {
   list.innerHTML=\`<table class="tbl"><thead><tr><th style="width:30px"></th><th style="width:30px">SEO</th><th>Artículo</th><th>Blog</th><th>Meta título</th><th>Meta desc.</th></tr></thead><tbody>
     \${items.map(a=>\`<tr onclick="toggleRow(this,'art')">
       <td><input type="checkbox" name="art_item" value="\${a.id}" data-obj='\${esc(JSON.stringify(a))}' onchange="afterSelChange('art');event.stopPropagation()"></td>
-      <td class="\${processedIds.articles.has(a.id)?'seo-done':'seo-none'}">\${processedIds.articles.has(a.id)?'✓':'—'}</td>
+      <td>\${processedIds.articles.has(a.id)?'<span class="seo-badge-yes">✓ SEO</span>':'<span class="seo-badge-no">—</span>'}</td>
       <td>\${esc(a.title)}</td>
       <td style="color:#aaa;font-size:11px">\${esc(a.blogTitle)}</td>
       <td class="\${a.currentMetaTitle?'meta-ok':'meta-no'}">\${a.currentMetaTitle?'✓':'✗'}</td>
@@ -911,6 +921,7 @@ function renderArtTable() {
     </tr>\`).join('')}
   </tbody></table>\`;
   document.getElementById('art-selall').style.display='block';
+  document.getElementById('art-sel-noseo').style.display='block';
   afterSelChange('art');
 }
 
@@ -945,13 +956,14 @@ function renderImgTable() {
   list.innerHTML=\`<table class="tbl"><thead><tr><th style="width:30px"></th><th style="width:30px">SEO</th><th>Imagen</th><th>Producto</th><th>Alt actual</th></tr></thead><tbody>
     \${items.map(img=>\`<tr onclick="toggleRow(this,'img')">
       <td><input type="checkbox" name="img_item" value="\${img.id}" data-obj='\${esc(JSON.stringify(img))}' onchange="afterSelChange('img');event.stopPropagation()"></td>
-      <td class="\${processedIds.images.has(img.id)?'seo-done':'seo-none'}">\${processedIds.images.has(img.id)?'✓':'—'}</td>
+      <td>\${processedIds.images.has(img.id)?'<span class="seo-badge-yes">✓ SEO</span>':'<span class="seo-badge-no">—</span>'}</td>
       <td><img src="\${esc(img.url)}" class="thumb" loading="lazy"></td>
       <td>\${esc(img.productTitle)}</td>
       <td style="font-size:11px;color:\${img.currentAlt?'#555':'#ccc'}">\${img.currentAlt||'(sin alt)'}</td>
     </tr>\`).join('')}
   </tbody></table>\`;
   document.getElementById('img-selall').style.display='block';
+  document.getElementById('img-sel-noseo').style.display='block';
   afterSelChange('img');
 }
 
