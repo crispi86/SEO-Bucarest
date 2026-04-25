@@ -159,6 +159,28 @@ app.get('/api/images', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── URL Apply ─────────────────────────────────────────────────────────────────
+app.post('/api/url/apply', async (req, res) => {
+  const { type, gid, oldHandle, newHandle } = req.body;
+  if (!gid || !newHandle) return res.status(400).json({ error: 'Faltan parámetros' });
+  try {
+    let handle;
+    const prefix = type === 'products' ? '/products/' : '/collections/';
+    if (type === 'products') handle = await shopify.updateProductHandle(gid, newHandle);
+    else if (type === 'collections') handle = await shopify.updateCollectionHandle(gid, newHandle);
+    else return res.status(400).json({ error: 'Tipo no soportado para URLs' });
+    if (oldHandle && oldHandle !== newHandle) {
+      shopify.createRedirect(prefix + oldHandle, prefix + handle).catch(e => console.warn('Redirect:', e.message));
+    }
+    history.unshift({ date: new Date().toISOString(), type: 'url', applied: [{ id: gid, oldHandle, newHandle: handle }], errors: [] });
+    if (history.length > 500) history.pop();
+    saveStore();
+    res.json({ ok: true, handle });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── SEO Queue & Stream ────────────────────────────────────────────────────────
 const jobs = new Map();
 
@@ -348,6 +370,9 @@ function adminUI(host) {
     .htbl tbody tr{border-bottom:1px solid #f0ece6}
     .htbl tbody td{padding:9px 12px;font-size:12px;color:#333}
     .type-badge{font-size:9px;padding:2px 7px;border-radius:10px;text-transform:uppercase;letter-spacing:0.06em;background:#faf8f5;border:1px solid #ddd6cc;color:#9a7f5a}
+    .url-upd-btn{background:none;border:1px solid #ddd6cc;color:#9a7f5a;cursor:pointer;padding:1px 5px;font-size:12px;font-family:inherit;line-height:1.2;transition:all 0.15s;flex-shrink:0}
+    .url-upd-btn:hover{border-color:#9a7f5a;background:#faf8f5}
+    .url-cell{min-width:150px}
   </style>
 </head>
 <body>
@@ -825,7 +850,17 @@ function renderProductTable(products) {
       <td><input type="checkbox" name="p_item" value="\${p.id}" data-gid="\${p.gid}" data-obj='\${esc(JSON.stringify(p))}' onchange="afterSelChange('p');event.stopPropagation()"></td>
       <td>\${esc(p.title)}</td>
       <td style="color:#aaa">\${esc(p.sku||'—')}</td>
-      <td><a class="url-link" href="https://\${SHOP}.myshopify.com/products/\${p.handle}" target="_blank" onclick="event.stopPropagation()">/\${esc(p.handle)}</a></td>
+      <td class="url-cell" onclick="event.stopPropagation()">
+        <div id="url-v-p-\${p.id}" style="display:flex;align-items:center;gap:4px">
+          <a class="url-link" href="https://\${SHOP}.myshopify.com/products/\${p.handle}" target="_blank">/\${esc(p.handle)}</a>
+          <button class="url-upd-btn" data-id="\${p.id}" data-gid="\${p.gid}" data-type="products" data-pfx="p" onclick="startURLEdit(this);event.stopPropagation()" title="Generar URL desde metatítulo">↻</button>
+        </div>
+        <div id="url-e-p-\${p.id}" style="display:none;align-items:center;gap:3px">
+          <input id="url-i-p-\${p.id}" style="padding:3px 6px;border:1px solid #9a7f5a;font-size:11px;font-family:inherit;outline:none;width:130px" onclick="event.stopPropagation()">
+          <button data-id="\${p.id}" data-gid="\${p.gid}" data-type="products" data-pfx="p" onclick="confirmURL(this);event.stopPropagation()" style="background:#2d6a2d;border:none;color:#fff;cursor:pointer;padding:3px 6px;font-size:11px;font-family:inherit">✓</button>
+          <button data-id="\${p.id}" data-pfx="p" onclick="cancelURLEdit(this);event.stopPropagation()" style="background:none;border:1px solid #ddd6cc;color:#888;cursor:pointer;padding:3px 6px;font-size:11px;font-family:inherit">✗</button>
+        </div>
+      </td>
       <td class="\${p.currentMetaTitle?'meta-ok':'meta-no'}" style="text-align:center">\${p.currentMetaTitle?'✓':'✗'}</td>
       <td class="\${p.currentMetaDescription?'meta-ok':'meta-no'}" style="text-align:center">\${p.currentMetaDescription?'✓':'✗'}</td>
       <td><span class="status-badge \${p.status==='active'?'s-active':'s-draft'}">\${p.status==='active'?'Activo':'Borrador'}</span></td>
@@ -866,7 +901,17 @@ function renderCollTable() {
     \${items.map(c=>\`<tr onclick="toggleRow(this,'c')">
       <td><input type="checkbox" name="c_item" value="\${c.id}" data-obj='\${esc(JSON.stringify(c))}' onchange="afterSelChange('c');event.stopPropagation()"></td>
       <td>\${esc(c.title)}</td>
-      <td><a class="url-link" href="https://\${SHOP}.myshopify.com/collections/\${c.handle}" target="_blank" onclick="event.stopPropagation()">/collections/\${esc(c.handle)}</a></td>
+      <td class="url-cell" onclick="event.stopPropagation()">
+        <div id="url-v-c-\${c.id}" style="display:flex;align-items:center;gap:4px">
+          <a class="url-link" href="https://\${SHOP}.myshopify.com/collections/\${c.handle}" target="_blank">/collections/\${esc(c.handle)}</a>
+          <button class="url-upd-btn" data-id="\${c.id}" data-gid="\${c.gid}" data-type="collections" data-pfx="c" onclick="startURLEdit(this);event.stopPropagation()" title="Generar URL desde metatítulo">↻</button>
+        </div>
+        <div id="url-e-c-\${c.id}" style="display:none;align-items:center;gap:3px">
+          <input id="url-i-c-\${c.id}" style="padding:3px 6px;border:1px solid #9a7f5a;font-size:11px;font-family:inherit;outline:none;width:130px" onclick="event.stopPropagation()">
+          <button data-id="\${c.id}" data-gid="\${c.gid}" data-type="collections" data-pfx="c" onclick="confirmURL(this);event.stopPropagation()" style="background:#2d6a2d;border:none;color:#fff;cursor:pointer;padding:3px 6px;font-size:11px;font-family:inherit">✓</button>
+          <button data-id="\${c.id}" data-pfx="c" onclick="cancelURLEdit(this);event.stopPropagation()" style="background:none;border:1px solid #ddd6cc;color:#888;cursor:pointer;padding:3px 6px;font-size:11px;font-family:inherit">✗</button>
+        </div>
+      </td>
       <td class="\${c.currentMetaTitle?'meta-ok':'meta-no'}" style="text-align:center">\${c.currentMetaTitle?'✓':'✗'}</td>
       <td class="\${c.currentMetaDescription?'meta-ok':'meta-no'}" style="text-align:center">\${c.currentMetaDescription?'✓':'✗'}</td>
     </tr>\`).join('')}
@@ -922,10 +967,11 @@ function renderMOTable() {
   else if (metaFilter==='incomplete') items=items.filter(m=>!m.currentMetaTitle||!m.currentMetaDescription);
   const list=document.getElementById('mo-list');
   if(!items.length){list.innerHTML='<p class="empty-msg">No hay metaobjetos en este filtro.</p>';afterSelChange('mo');return;}
-  list.innerHTML=\`<table class="tbl"><thead><tr><th style="width:30px"></th><th>Nombre</th><th style="width:36px;text-align:center">Tít.</th><th style="width:36px;text-align:center">Desc.</th></tr></thead><tbody>
+  list.innerHTML=\`<table class="tbl"><thead><tr><th style="width:30px"></th><th>Nombre</th><th>Handle</th><th style="width:36px;text-align:center">Tít.</th><th style="width:36px;text-align:center">Desc.</th></tr></thead><tbody>
     \${items.map(m=>\`<tr onclick="toggleRow(this,'mo')">
       <td><input type="checkbox" name="mo_item" value="\${m.id}" data-obj='\${esc(JSON.stringify(m))}' onchange="afterSelChange('mo');event.stopPropagation()"></td>
       <td>\${esc(m.displayName)}</td>
+      <td style="color:#aaa;font-size:11px">/\${esc(m.handle)}</td>
       <td class="\${m.currentMetaTitle?'meta-ok':'meta-no'}" style="text-align:center">\${m.currentMetaTitle?'✓':'✗'}</td>
       <td class="\${m.currentMetaDescription?'meta-ok':'meta-no'}" style="text-align:center">\${m.currentMetaDescription?'✓':'✗'}</td>
     </tr>\`).join('')}
@@ -951,11 +997,12 @@ function renderArtTable() {
   else if (metaFilter==='incomplete') items=items.filter(a=>!a.currentMetaTitle||!a.currentMetaDescription);
   const list=document.getElementById('art-list');
   if(!items.length){list.innerHTML='<p class="empty-msg">No hay artículos en este filtro.</p>';afterSelChange('art');return;}
-  list.innerHTML=\`<table class="tbl"><thead><tr><th style="width:30px"></th><th>Artículo</th><th>Blog</th><th style="width:36px;text-align:center">Tít.</th><th style="width:36px;text-align:center">Desc.</th></tr></thead><tbody>
+  list.innerHTML=\`<table class="tbl"><thead><tr><th style="width:30px"></th><th>Artículo</th><th>Blog</th><th>Handle</th><th style="width:36px;text-align:center">Tít.</th><th style="width:36px;text-align:center">Desc.</th></tr></thead><tbody>
     \${items.map(a=>\`<tr onclick="toggleRow(this,'art')">
       <td><input type="checkbox" name="art_item" value="\${a.id}" data-obj='\${esc(JSON.stringify(a))}' onchange="afterSelChange('art');event.stopPropagation()"></td>
       <td>\${esc(a.title)}</td>
       <td style="color:#aaa;font-size:11px">\${esc(a.blogTitle)}</td>
+      <td style="color:#aaa;font-size:11px">/\${esc(a.handle)}</td>
       <td class="\${a.currentMetaTitle?'meta-ok':'meta-no'}" style="text-align:center">\${a.currentMetaTitle?'✓':'✗'}</td>
       <td class="\${a.currentMetaDescription?'meta-ok':'meta-no'}" style="text-align:center">\${a.currentMetaDescription?'✓':'✗'}</td>
     </tr>\`).join('')}
@@ -1240,6 +1287,60 @@ async function loadHistory() {
       </tr>\`).join('')}
     </tbody></table>\`;
   } catch(e){container.textContent='Error cargando historial.';}
+}
+
+// ── URL inline edit ───────────────────────────────────────────────────────────
+function generateSlug(text) {
+  const STOP = new Set(['de','para','en','y','la','el','un','una','los','las','con','a','se','del','al','por','su','sus','que','es','son','lo']);
+  return (text||'').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9\s]/g,' ').trim()
+    .split(/\s+/).filter(w=>w&&!STOP.has(w))
+    .slice(0,6).join('-') || 'sin-titulo';
+}
+
+function startURLEdit(btn) {
+  const {id, gid, type, pfx} = btn.dataset;
+  const item = (sections[type]?.items||[]).find(x=>x.id===id||x.gid===gid);
+  if (!item?.currentMetaTitle) {
+    const inp = document.getElementById('url-i-'+pfx+'-'+id);
+    if (inp) inp.value = item?.handle || '';
+  } else {
+    document.getElementById('url-i-'+pfx+'-'+id).value = generateSlug(item.currentMetaTitle);
+  }
+  document.getElementById('url-v-'+pfx+'-'+id).style.display = 'none';
+  document.getElementById('url-e-'+pfx+'-'+id).style.display = 'flex';
+  document.getElementById('url-i-'+pfx+'-'+id).focus();
+}
+
+function cancelURLEdit(btn) {
+  const {id, pfx} = btn.dataset;
+  document.getElementById('url-e-'+pfx+'-'+id).style.display = 'none';
+  document.getElementById('url-v-'+pfx+'-'+id).style.display = 'flex';
+}
+
+async function confirmURL(btn) {
+  const {id, gid, type, pfx} = btn.dataset;
+  const newHandle = (document.getElementById('url-i-'+pfx+'-'+id)?.value||'').trim();
+  if (!newHandle) return;
+  const item = (sections[type]?.items||[]).find(x=>x.id===id||x.gid===gid);
+  const oldHandle = item?.handle || '';
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    const res = await fetch('/api/url/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,gid,oldHandle,newHandle})}).then(r=>r.json());
+    if (res.error) throw new Error(res.error);
+    if (item) item.handle = res.handle;
+    const viewEl = document.getElementById('url-v-'+pfx+'-'+id);
+    const editEl = document.getElementById('url-e-'+pfx+'-'+id);
+    const urlPfx = type==='products'?'/products/':'/collections/';
+    const link = viewEl?.querySelector('.url-link');
+    if (link) { link.textContent = urlPfx+res.handle; link.href='https://'+SHOP+'.myshopify.com'+urlPfx+res.handle; }
+    editEl.style.display='none'; viewEl.style.display='flex';
+  } catch(e) {
+    alert('Error: '+e.message);
+    btn.disabled=false; btn.textContent=orig;
+  }
 }
 
 init();

@@ -342,10 +342,55 @@ async function updateImageAlt(productId, imageId, altText) {
   return true;
 }
 
+// ── URL MANAGEMENT ────────────────────────────────────────────────────────────
+
+async function updateProductHandle(productGid, handle) {
+  const result = await graphqlRequest(`
+    mutation productUpdate($input: ProductInput!) {
+      productUpdate(input: $input) {
+        product { id handle }
+        userErrors { field message }
+      }
+    }
+  `, { input: { id: productGid, handle } });
+  const errors = result?.data?.productUpdate?.userErrors || [];
+  if (errors.length) throw new Error(errors.map(e => e.message).join(', '));
+  return result.data.productUpdate.product.handle;
+}
+
+async function updateCollectionHandle(collectionGid, handle) {
+  const result = await graphqlRequest(`
+    mutation collectionUpdate($input: CollectionInput!) {
+      collectionUpdate(input: $input) {
+        collection { id handle }
+        userErrors { field message }
+      }
+    }
+  `, { input: { id: collectionGid, handle } });
+  const errors = result?.data?.collectionUpdate?.userErrors || [];
+  if (errors.length) throw new Error(errors.map(e => e.message).join(', '));
+  return result.data.collectionUpdate.collection.handle;
+}
+
+async function createRedirect(path, target) {
+  const result = await graphqlRequest(`
+    mutation urlRedirectCreate($urlRedirect: UrlRedirectInput!) {
+      urlRedirectCreate(urlRedirect: $urlRedirect) {
+        urlRedirect { id path target }
+        userErrors { field message }
+      }
+    }
+  `, { urlRedirect: { path, target } });
+  const errors = result?.data?.urlRedirectCreate?.userErrors || [];
+  if (errors.length) console.warn('Redirect warn:', errors.map(e => e.message).join(', '));
+  return true;
+}
+
 module.exports = {
   getProductsByCollection, getProductsByQuery, updateProductSEO,
   getCollections, getCollectionsWithSEO, updateCollectionSEO,
   getMetaobjectTypes, getMetaobjectsByType, updateMetaobjectSEO,
   getBlogArticles, updateArticleSEO,
   getProductsWithImages, updateImageAlt,
+  updateProductHandle, updateCollectionHandle, createRedirect,
 };
