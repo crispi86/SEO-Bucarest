@@ -163,10 +163,10 @@ app.get('/api/images', async (req, res) => {
 const jobs = new Map();
 
 app.post('/api/seo/queue', (req, res) => {
-  const { type, items } = req.body;
+  const { type, items, oneTimeRules } = req.body;
   if (!items?.length) return res.status(400).json({ error: 'Sin items' });
   const jobId = crypto.randomBytes(8).toString('hex');
-  jobs.set(jobId, { type, items });
+  jobs.set(jobId, { type, items, oneTimeRules: oneTimeRules || '' });
   res.json({ jobId });
 });
 
@@ -180,18 +180,19 @@ app.get('/api/seo/stream/:jobId', async (req, res) => {
 
   const send = data => res.write(`data: ${JSON.stringify(data)}\n\n`);
   const ping = () => res.write(`: keepalive\n\n`);
-  const { type, items } = job;
+  const { type, items, oneTimeRules } = job;
+  const buildRules = t => getRulesForType(t) + (oneTimeRules ? '\n' + oneTimeRules : '');
 
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     ping();
     try {
       let result;
-      if (type === 'products') result = await seo.generateSEO(item, getRulesForType('products'));
-      else if (type === 'collections') result = await seo.generateCollectionSEO(item, getRulesForType('collections'));
-      else if (type === 'metaobjects') result = await seo.generateMetaobjectSEO(item, getRulesForType('metaobjects'));
-      else if (type === 'articles') result = await seo.generateArticleSEO(item, getRulesForType('articles'));
-      else if (type === 'images') result = { ...item, altText: await seo.generateAltText(item, getRulesForType('images')) };
+      if (type === 'products') result = await seo.generateSEO(item, buildRules('products'));
+      else if (type === 'collections') result = await seo.generateCollectionSEO(item, buildRules('collections'));
+      else if (type === 'metaobjects') result = await seo.generateMetaobjectSEO(item, buildRules('metaobjects'));
+      else if (type === 'articles') result = await seo.generateArticleSEO(item, buildRules('articles'));
+      else if (type === 'images') result = { ...item, altText: await seo.generateAltText(item, buildRules('images')) };
       send({ ...result, index: i + 1, total: items.length });
     } catch (e) {
       send({ error: e.message, itemTitle: item.productTitle || item.collectionTitle || item.metaobjectTitle || item.articleTitle || item.productTitle || '(sin nombre)', index: i + 1, total: items.length });
@@ -415,6 +416,10 @@ function adminUI(host) {
     <div id="p-list"></div>
     <div class="sel-row"><span class="sel-count" id="p-count"></span><div style="display:flex;gap:8px"><button class="sel-all-btn" id="p-sel-noseo" onclick="selWithoutSEO('p','products')" style="display:none">Selec. sin SEO</button><button class="sel-all-btn" id="p-selall" onclick="selAll('p')" style="display:none">Seleccionar todos</button></div></div>
   </div>
+  <div style="margin-top:14px" id="p-one-time-wrap">
+    <label style="font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:#9a7f5a;display:block;margin-bottom:5px">Instrucción puntual para esta generación <span style="opacity:0.5;font-size:9px;text-transform:none;letter-spacing:0">(opcional — no se guarda)</span></label>
+    <textarea id="p-one-time-rules" rows="2" style="width:100%;padding:8px 12px;border:1px solid #ddd6cc;background:#fdfcfb;font-size:12px;font-family:inherit;outline:none;color:#1a1a1a;resize:vertical;transition:border-color 0.2s" placeholder="Ej: Estos productos son de madera tallada, destacar la artesanía."></textarea>
+  </div>
   <div class="btn-row">
     <button class="btn btn-primary" id="p-gen-btn" onclick="startGen('products')" disabled>Generar SEO con Claude</button>
     <span class="btn-hint" id="p-hint">Seleccione productos</span>
@@ -442,6 +447,10 @@ function adminUI(host) {
     <div id="c-list"></div>
     <div class="sel-row"><span class="sel-count" id="c-count"></span><div style="display:flex;gap:8px"><button class="sel-all-btn" id="c-sel-noseo" onclick="selWithoutSEO('c','collections')" style="display:none">Selec. sin SEO</button><button class="sel-all-btn" id="c-selall" onclick="selAll('c')" style="display:none">Seleccionar todos</button></div></div>
   </div>
+  <div style="margin-top:14px">
+    <label style="font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:#9a7f5a;display:block;margin-bottom:5px">Instrucción puntual para esta generación <span style="opacity:0.5;font-size:9px;text-transform:none;letter-spacing:0">(opcional — no se guarda)</span></label>
+    <textarea id="c-one-time-rules" rows="2" style="width:100%;padding:8px 12px;border:1px solid #ddd6cc;background:#fdfcfb;font-size:12px;font-family:inherit;outline:none;color:#1a1a1a;resize:vertical;transition:border-color 0.2s" placeholder="Ej: Esta colección es de invierno, enfatizar calidez."></textarea>
+  </div>
   <div class="btn-row">
     <button class="btn btn-primary" id="c-gen-btn" onclick="startGen('collections')" disabled>Generar SEO con Claude</button>
     <span class="btn-hint" id="c-hint">Cargue las colecciones primero</span>
@@ -468,6 +477,10 @@ function adminUI(host) {
     </div>
     <div id="mo-list"></div>
     <div class="sel-row"><span class="sel-count" id="mo-count"></span><div style="display:flex;gap:8px"><button class="sel-all-btn" id="mo-sel-noseo" onclick="selWithoutSEO('mo','metaobjects')" style="display:none">Selec. sin SEO</button><button class="sel-all-btn" id="mo-selall" onclick="selAll('mo')" style="display:none">Seleccionar todos</button></div></div>
+  </div>
+  <div style="margin-top:14px">
+    <label style="font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:#9a7f5a;display:block;margin-bottom:5px">Instrucción puntual para esta generación <span style="opacity:0.5;font-size:9px;text-transform:none;letter-spacing:0">(opcional — no se guarda)</span></label>
+    <textarea id="mo-one-time-rules" rows="2" style="width:100%;padding:8px 12px;border:1px solid #ddd6cc;background:#fdfcfb;font-size:12px;font-family:inherit;outline:none;color:#1a1a1a;resize:vertical;transition:border-color 0.2s" placeholder="Ej: Son artistas chilenos del siglo XX, destacar su época."></textarea>
   </div>
   <div class="btn-row">
     <button class="btn btn-primary" id="mo-gen-btn" onclick="startGen('metaobjects')" disabled>Generar SEO con Claude</button>
@@ -498,6 +511,10 @@ function adminUI(host) {
     </div>
     <div id="art-list"></div>
     <div class="sel-row"><span class="sel-count" id="art-count"></span><div style="display:flex;gap:8px"><button class="sel-all-btn" id="art-sel-noseo" onclick="selWithoutSEO('art','articles')" style="display:none">Selec. sin SEO</button><button class="sel-all-btn" id="art-selall" onclick="selAll('art')" style="display:none">Seleccionar todos</button></div></div>
+  </div>
+  <div style="margin-top:14px">
+    <label style="font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:#9a7f5a;display:block;margin-bottom:5px">Instrucción puntual para esta generación <span style="opacity:0.5;font-size:9px;text-transform:none;letter-spacing:0">(opcional — no se guarda)</span></label>
+    <textarea id="art-one-time-rules" rows="2" style="width:100%;padding:8px 12px;border:1px solid #ddd6cc;background:#fdfcfb;font-size:12px;font-family:inherit;outline:none;color:#1a1a1a;resize:vertical;transition:border-color 0.2s" placeholder="Ej: Son artículos de guía de decoración, enfocarse en inspiración."></textarea>
   </div>
   <div class="btn-row">
     <button class="btn btn-primary" id="art-gen-btn" onclick="startGen('articles')" disabled>Generar SEO con Claude</button>
@@ -543,6 +560,10 @@ function adminUI(host) {
     </div>
     <div id="img-list"></div>
     <div class="sel-row"><span class="sel-count" id="img-count"></span><div style="display:flex;gap:8px"><button class="sel-all-btn" id="img-sel-noseo" onclick="selWithoutSEO('img','images')" style="display:none">Selec. sin SEO</button><button class="sel-all-btn" id="img-selall" onclick="selAll('img')" style="display:none">Seleccionar todas</button></div></div>
+  </div>
+  <div style="margin-top:14px">
+    <label style="font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:#9a7f5a;display:block;margin-bottom:5px">Instrucción puntual para esta generación <span style="opacity:0.5;font-size:9px;text-transform:none;letter-spacing:0">(opcional — no se guarda)</span></label>
+    <textarea id="img-one-time-rules" rows="2" style="width:100%;padding:8px 12px;border:1px solid #ddd6cc;background:#fdfcfb;font-size:12px;font-family:inherit;outline:none;color:#1a1a1a;resize:vertical;transition:border-color 0.2s" placeholder="Ej: Son detalles de marquetería, describir la técnica."></textarea>
   </div>
   <div class="btn-row">
     <button class="btn btn-primary" id="img-gen-btn" onclick="startGen('images')" disabled>Generar alt text con Claude</button>
@@ -594,7 +615,7 @@ function adminUI(host) {
   </div>
   <div class="card" style="margin-top:0">
     <span class="section-label">Reglas base (siempre activas)</span>
-    <pre style="font-size:11px;color:#aaa;white-space:pre-wrap;line-height:1.6">• Metatítulo: máx 60 caracteres. Keyword cotidiana.\n• Metadescripción: máx 160 caracteres. Termina con "Envíos a todo Chile."\n• Nunca uses lenguaje técnico, francés ni inglés.\n• Tono: lujoso y exclusivo, nunca genérico.\n• Idioma: español.</pre>
+    <pre style="font-size:11px;color:#aaa;white-space:pre-wrap;line-height:1.6">• Metatítulo: máx 60 caracteres — aprovechar todo el espacio posible.\n• Metadescripción: máx 160 caracteres — aprovechar todo el espacio posible.\n• Nunca uses lenguaje técnico, francés ni inglés.\n• Tono: lujoso y elegante, nunca genérico.\n• Idioma: español.\n• NUNCA: "Envíos a todo Chile." ni variantes.\n• NUNCA: exclusivo, único, irrepetible, excepcional, de colección, coleccionista, ni sinónimos.\n• NUNCA mencionar "Bucarest Art &amp; Antiques".\n• NUNCA "traído desde Francia" — usar "francés" o "europeo".\n• Sumar términos funcionales que la gente busca (ej: alfombra mediana, escritorio para el living).</pre>
   </div>
 </div>
 
@@ -977,6 +998,8 @@ async function startGen(type) {
   const allItems = checkboxes.map(c => JSON.parse(c.dataset.obj));
   if (!allItems.length) return;
 
+  const oneTimeRules = (document.getElementById(prefix+'-one-time-rules')?.value || '').trim();
+
   sections[type].results = [];
   document.getElementById(prefix+'-rtbody').innerHTML='';
   document.getElementById(prefix+'-results').style.display='none';
@@ -990,7 +1013,7 @@ async function startGen(type) {
 
   for (let b = 0; b < allItems.length; b += BATCH) {
     const chunk = allItems.slice(b, b + BATCH);
-    const ok = await runChunk(type, prefix, chunk, done, total);
+    const ok = await runChunk(type, prefix, chunk, done, total, oneTimeRules);
     if (!ok) return;
     done += chunk.length;
   }
@@ -1001,10 +1024,10 @@ async function startGen(type) {
   showGenResults(type);
 }
 
-function runChunk(type, prefix, items, offset, total) {
+function runChunk(type, prefix, items, offset, total, oneTimeRules) {
   return new Promise(async resolve => {
     try {
-      const {jobId} = await fetch('/api/seo/queue',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,items})}).then(r=>r.json());
+      const {jobId} = await fetch('/api/seo/queue',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,items,oneTimeRules:oneTimeRules||''})}).then(r=>r.json());
       const es = new EventSource('/api/seo/stream/'+jobId);
       es.onmessage = e => {
         const data = JSON.parse(e.data);

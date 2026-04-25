@@ -7,12 +7,17 @@ El vendedor habla técnico; el comprador busca en lenguaje cotidiano.
 Ejemplo: "Secretaire Luis XVI con marquetería siglo XIX" → comprador busca "escritorio antiguo de madera con tapa".`;
 
 const SEO_RULES = `REGLAS ESTRICTAS:
-• Metatítulo: MÁXIMO 60 caracteres. Keyword cotidiana que usaría el comprador en Google.
-• Metadescripción: MÁXIMO 160 caracteres. Termina con "Envíos a todo Chile."
+• Metatítulo: MÁXIMO 60 caracteres. Úsalos todos o lo más cerca posible. Keyword cotidiana que usaría el comprador en Google.
+• Metadescripción: MÁXIMO 160 caracteres. Úsalos todos o lo más cerca posible.
 • Nunca uses lenguaje técnico, francés ni inglés.
 • Incluye "Santiago" o "Providencia" solo si cabe naturalmente.
-• Tono: lujoso y exclusivo, nunca genérico.
-• Idioma: español.`;
+• Tono: lujoso y elegante, nunca genérico.
+• Idioma: español.
+• NUNCA uses "Envíos a todo Chile." ni ninguna variante de esa frase.
+• NUNCA uses las palabras exclusivo, única, único, irrepetible, excepcional, singular, inigualable, de colección, coleccionista, coleccionismo, ni sus sinónimos.
+• NUNCA menciones "Bucarest Art & Antiques" ni "disponible en Bucarest Art & Antiques".
+• NUNCA digas "traído desde Francia" ni variantes; usa simplemente "francés" o "europeo".
+• Suma términos funcionales y de tamaño que la gente busca en Google (ej: alfombra mediana, escritorio para el living, silla de comedor antigua, mesa de centro de madera).`;
 
 async function callClaude(prompt) {
   const response = await client.messages.create({
