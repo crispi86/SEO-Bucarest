@@ -1294,8 +1294,8 @@ function generateSlug(text) {
   const STOP = new Set(['de','para','en','y','la','el','un','una','los','las','con','a','se','del','al','por','su','sus','que','es','son','lo']);
   return (text||'').toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-    .replace(/[^a-z0-9\s]/g,' ').trim()
-    .split(/\s+/).filter(w=>w&&!STOP.has(w))
+    .replace(/[^a-z0-9\\s]/g,' ').trim()
+    .split(/\\s+/).filter(w=>w&&!STOP.has(w))
     .slice(0,6).join('-') || 'sin-titulo';
 }
 
