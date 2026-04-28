@@ -703,7 +703,7 @@ function showPage(name, btn) {
 let dbTimer;
 function debounce(fn,ms){clearTimeout(dbTimer);dbTimer=setTimeout(fn,ms);}
 
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 
 function charCount(inp, limit, cid) {
   const n = inp.value.length;
