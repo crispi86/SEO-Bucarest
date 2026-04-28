@@ -455,6 +455,14 @@ function adminUI(host) {
           </div>
         </div>
         <div>
+          <div style="font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:#aaa;margin-bottom:6px">Meta descripción</div>
+          <div class="seo-filter" id="p-desc-filter">
+            <button class="seo-filter-btn active" onclick="setPDescFilter('all',this)">Todos</button>
+            <button class="seo-filter-btn" onclick="setPDescFilter('done',this)">Con descripción</button>
+            <button class="seo-filter-btn" onclick="setPDescFilter('none',this)">Sin descripción</button>
+          </div>
+        </div>
+        <div>
           <div style="font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:#aaa;margin-bottom:6px">URL</div>
           <div class="seo-filter" id="p-url-filter">
             <button class="seo-filter-btn active" onclick="setPUrlFilter('all',this)">Todos</button>
@@ -684,7 +692,7 @@ function adminUI(host) {
 <script>
 // ── State ─────────────────────────────────────────────────────────────────────
 const sections = {
-  products:    { prefix:'p',   items:[], results:[], seoFilter:'all', metaFilter:'all', statusFilter:'all', stockFilter:'all', urlFilter:'all' },
+  products:    { prefix:'p',   items:[], results:[], seoFilter:'all', metaFilter:'all', statusFilter:'all', stockFilter:'all', urlFilter:'all', descFilter:'all' },
   collections: { prefix:'c',   items:[], results:[], seoFilter:'all', metaFilter:'all' },
   metaobjects: { prefix:'mo',  items:[], results:[], seoFilter:'all', metaFilter:'all' },
   articles:    { prefix:'art', items:[], results:[], seoFilter:'all', metaFilter:'all' },
@@ -842,6 +850,12 @@ function setPStockFilter(f, btn) {
   renderProductTable(sections.products.items);
 }
 
+function setPDescFilter(f, btn) {
+  sections.products.descFilter = f;
+  document.querySelectorAll('#p-desc-filter .seo-filter-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
+  renderProductTable(sections.products.items);
+}
+
 function setPUrlFilter(f, btn) {
   sections.products.urlFilter = f;
   document.querySelectorAll('#p-url-filter .seo-filter-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
@@ -860,7 +874,7 @@ async function loadProducts() {
 }
 
 function renderProductTable(products) {
-  const { seoFilter, metaFilter, statusFilter, stockFilter, urlFilter } = sections.products;
+  const { seoFilter, metaFilter, statusFilter, stockFilter, urlFilter, descFilter } = sections.products;
   let filtered = products;
   if (seoFilter === 'done')   filtered = filtered.filter(p => processedIds.products.has(p.id));
   else if (seoFilter === 'none') filtered = filtered.filter(p => !processedIds.products.has(p.id));
@@ -872,6 +886,8 @@ function renderProductTable(products) {
   else if (stockFilter === 'soldout') filtered = filtered.filter(p => p.totalInventory <= 0);
   if (urlFilter === 'done')    filtered = filtered.filter(p => changedUrlIds.products.has(p.gid));
   else if (urlFilter === 'pending') filtered = filtered.filter(p => !changedUrlIds.products.has(p.gid));
+  if (descFilter === 'done')  filtered = filtered.filter(p => p.currentMetaDescription);
+  else if (descFilter === 'none') filtered = filtered.filter(p => !p.currentMetaDescription);
 
   const list=document.getElementById('p-list');
   const extraFilters=document.getElementById('p-extra-filters');
