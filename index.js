@@ -47,12 +47,17 @@ const processedIds = {
   articles: new Set(store.processedIds?.articles || []),
   images: new Set(store.processedIds?.images || []),
 };
+const changedUrls = {
+  products: new Set(store.changedUrls?.products || []),
+  collections: new Set(store.changedUrls?.collections || []),
+};
 let history = store.history || [];
 let settings = { extraRules: '', rules: [], ...(store.settings || {}) };
 
 function saveStore() {
   const data = {
     processedIds: Object.fromEntries(Object.entries(processedIds).map(([k, v]) => [k, [...v]])),
+    changedUrls: { products: [...changedUrls.products], collections: [...changedUrls.collections] },
     history,
     settings,
   };
@@ -79,7 +84,10 @@ function getRulesForType(type) {
 }
 
 app.get('/api/processed-ids', (req, res) => {
-  res.json(Object.fromEntries(Object.entries(processedIds).map(([k, v]) => [k, [...v]])));
+  res.json({
+    ...Object.fromEntries(Object.entries(processedIds).map(([k, v]) => [k, [...v]])),
+    changedUrls: { products: [...changedUrls.products], collections: [...changedUrls.collections] },
+  });
 });
 
 app.get('/api/history', (req, res) => res.json(history));
@@ -172,6 +180,7 @@ app.post('/api/url/apply', async (req, res) => {
     if (oldHandle && oldHandle !== newHandle) {
       shopify.createRedirect(prefix + oldHandle, prefix + handle).catch(e => console.warn('Redirect:', e.message));
     }
+    if (changedUrls[type]) changedUrls[type].add(gid);
     history.unshift({ date: new Date().toISOString(), type: 'url', applied: [{ id: gid, oldHandle, newHandle: handle }], errors: [] });
     if (history.length > 500) history.pop();
     saveStore();
@@ -372,6 +381,7 @@ function adminUI(host) {
     .type-badge{font-size:9px;padding:2px 7px;border-radius:10px;text-transform:uppercase;letter-spacing:0.06em;background:#faf8f5;border:1px solid #ddd6cc;color:#9a7f5a}
     .url-upd-btn{background:none;border:1px solid #ddd6cc;color:#9a7f5a;cursor:pointer;padding:1px 5px;font-size:12px;font-family:inherit;line-height:1.2;transition:all 0.15s;flex-shrink:0}
     .url-upd-btn:hover{border-color:#9a7f5a;background:#faf8f5}
+    .url-upd-done{border-color:#b8d8bc!important;background:#e6f4ea!important;color:#2d6a2d!important}
     .url-cell{min-width:150px}
   </style>
 </head>
@@ -671,6 +681,7 @@ const sections = {
   images:      { prefix:'img', items:[], results:[], seoFilter:'all', metaFilter:'all' },
 };
 let processedIds = { products:new Set(), collections:new Set(), metaobjects:new Set(), articles:new Set(), images:new Set() };
+let changedUrlIds = { products:new Set(), collections:new Set() };
 let pFilterType = 'collection';
 let imgFilterType = 'collection';
 const SHOP = '${shopDomain}';
@@ -681,7 +692,8 @@ async function init() {
     fetch('/api/collections').then(r=>r.json()),
     fetch('/api/processed-ids').then(r=>r.json()),
   ]);
-  Object.keys(pids).forEach(k => processedIds[k] = new Set(pids[k]));
+  Object.keys(pids).forEach(k => { if (k !== 'changedUrls') processedIds[k] = new Set(pids[k]); });
+  if (pids.changedUrls) { changedUrlIds.products = new Set(pids.changedUrls.products||[]); changedUrlIds.collections = new Set(pids.changedUrls.collections||[]); }
   ['p-col','img-col'].forEach(id => {
     const sel = document.getElementById(id);
     cols.forEach(c => { const o = document.createElement('option'); o.value=c.id; o.textContent=c.title; sel.appendChild(o); });
@@ -850,10 +862,10 @@ function renderProductTable(products) {
       <td><input type="checkbox" name="p_item" value="\${p.id}" data-gid="\${p.gid}" data-obj='\${esc(JSON.stringify(p))}' onchange="afterSelChange('p');event.stopPropagation()"></td>
       <td>\${esc(p.title)}</td>
       <td style="color:#aaa">\${esc(p.sku||'—')}</td>
-      <td class="url-cell" onclick="event.stopPropagation()">
+      <td class="url-cell" id="url-cell-p-\${p.id}" onclick="event.stopPropagation()">
         <div id="url-v-p-\${p.id}" style="display:flex;align-items:center;gap:4px">
           <a class="url-link" href="https://\${SHOP}.myshopify.com/products/\${p.handle}" target="_blank">/\${esc(p.handle)}</a>
-          <button class="url-upd-btn" data-id="\${p.id}" data-gid="\${p.gid}" data-type="products" data-pfx="p" onclick="startURLEdit(this);event.stopPropagation()" title="Generar URL desde metatítulo">↻</button>
+          <button class="url-upd-btn\${changedUrlIds.products.has(p.gid)?' url-upd-done':''}" id="url-btn-p-\${p.id}" data-id="\${p.id}" data-gid="\${p.gid}" data-type="products" data-pfx="p" onclick="startURLEdit(this);event.stopPropagation()" title="Generar URL desde metatítulo">\${changedUrlIds.products.has(p.gid)?'✓':'↻'}</button>
         </div>
         <div id="url-e-p-\${p.id}" style="display:none;align-items:center;gap:3px">
           <input id="url-i-p-\${p.id}" style="padding:3px 6px;border:1px solid #9a7f5a;font-size:11px;font-family:inherit;outline:none;width:130px" onclick="event.stopPropagation()">
@@ -901,10 +913,10 @@ function renderCollTable() {
     \${items.map(c=>\`<tr onclick="toggleRow(this,'c')">
       <td><input type="checkbox" name="c_item" value="\${c.id}" data-obj='\${esc(JSON.stringify(c))}' onchange="afterSelChange('c');event.stopPropagation()"></td>
       <td>\${esc(c.title)}</td>
-      <td class="url-cell" onclick="event.stopPropagation()">
+      <td class="url-cell" id="url-cell-c-\${c.id}" onclick="event.stopPropagation()">
         <div id="url-v-c-\${c.id}" style="display:flex;align-items:center;gap:4px">
           <a class="url-link" href="https://\${SHOP}.myshopify.com/collections/\${c.handle}" target="_blank">/collections/\${esc(c.handle)}</a>
-          <button class="url-upd-btn" data-id="\${c.id}" data-gid="\${c.gid}" data-type="collections" data-pfx="c" onclick="startURLEdit(this);event.stopPropagation()" title="Generar URL desde metatítulo">↻</button>
+          <button class="url-upd-btn\${changedUrlIds.collections.has(c.gid)?' url-upd-done':''}" id="url-btn-c-\${c.id}" data-id="\${c.id}" data-gid="\${c.gid}" data-type="collections" data-pfx="c" onclick="startURLEdit(this);event.stopPropagation()" title="Generar URL desde metatítulo">\${changedUrlIds.collections.has(c.gid)?'✓':'↻'}</button>
         </div>
         <div id="url-e-c-\${c.id}" style="display:none;align-items:center;gap:3px">
           <input id="url-i-c-\${c.id}" style="padding:3px 6px;border:1px solid #9a7f5a;font-size:11px;font-family:inherit;outline:none;width:130px" onclick="event.stopPropagation()">
@@ -1336,7 +1348,11 @@ async function confirmURL(btn) {
     const urlPfx = type==='products'?'/products/':'/collections/';
     const link = viewEl?.querySelector('.url-link');
     if (link) { link.textContent = urlPfx+res.handle; link.href='https://'+SHOP+'.myshopify.com'+urlPfx+res.handle; }
-    editEl.style.display='none'; viewEl.style.display='flex';
+    if (changedUrlIds[type]) changedUrlIds[type].add(gid);
+    if (editEl) editEl.style.display='none';
+    if (viewEl) viewEl.style.display='flex';
+    const updBtn = btn.closest('td')?.querySelector('.url-upd-btn');
+    if (updBtn) { updBtn.textContent='✓'; updBtn.classList.add('url-upd-done'); }
   } catch(e) {
     alert('Error: '+e.message);
     btn.disabled=false; btn.textContent=orig;
