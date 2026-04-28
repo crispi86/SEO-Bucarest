@@ -195,8 +195,8 @@ PINTURA:
 - Año: ${año || '(no especificado, no inventar)'}
 
 INSTRUCCIONES ESPECÍFICAS PARA PINTURAS:
-Metatítulo (máx 60 caracteres): sigue este formato → "[Temática] - [Autor] - Pintura [Técnica]"
-Si el autor es muy conocido en Chile, puede ir primero. Usa lenguaje cotidiano.
+Metatítulo (máx 60 caracteres): formato FIJO, sin excepciones → "[Autor] - [Temática] - [Técnica]"
+El autor siempre va primero. Nunca cambies el orden. Si no cabe todo, acorta la temática o la técnica, nunca el autor.
 Metadescripción (máx 160 caracteres): texto natural que incluya técnica${soporte ? ', soporte' : ''}${año ? ', año' : ''}, autor y temática.
 Suma términos de búsqueda: "pintura chilena" o "obra de arte chilena" según corresponda.
 Incluye "Santiago" o "Providencia" si cabe naturalmente.
