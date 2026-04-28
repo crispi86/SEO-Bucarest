@@ -865,12 +865,22 @@ function setPUrlFilter(f, btn) {
 async function loadProducts() {
   const load = document.getElementById('p-loading');
   load.style.display='block'; document.getElementById('p-list').innerHTML=''; sections.products.items=[];
-  let url='/api/products?limit=50&';
-  if(pFilterType==='collection'){const v=document.getElementById('p-col').value;if(!v){load.style.display='none';return;}url+='collection_id='+v;}
-  else if(pFilterType==='tag'){const v=document.getElementById('p-tag').value.trim();if(!v){load.style.display='none';return;}url+='tag='+encodeURIComponent(v);}
-  else if(pFilterType==='title'){const v=document.getElementById('p-title').value.trim();if(!v){load.style.display='none';return;}url+='title='+encodeURIComponent(v);}
-  try{const d=await fetch(url).then(r=>r.json());sections.products.items=d.products||[];load.style.display='none';renderProductTable(sections.products.items);}
-  catch(e){load.style.display='none';document.getElementById('p-list').innerHTML='<p class="empty-msg">Error cargando productos.</p>';}
+  let baseUrl='/api/products?limit=50&';
+  if(pFilterType==='collection'){const v=document.getElementById('p-col').value;if(!v){load.style.display='none';return;}baseUrl+='collection_id='+v;}
+  else if(pFilterType==='tag'){const v=document.getElementById('p-tag').value.trim();if(!v){load.style.display='none';return;}baseUrl+='tag='+encodeURIComponent(v);}
+  else if(pFilterType==='title'){const v=document.getElementById('p-title').value.trim();if(!v){load.style.display='none';return;}baseUrl+='title='+encodeURIComponent(v);}
+  try {
+    let all=[], cursor=null;
+    do {
+      const url = cursor ? baseUrl+'&after='+encodeURIComponent(cursor) : baseUrl;
+      const d = await fetch(url).then(r=>r.json());
+      all = all.concat(d.products||[]);
+      load.textContent = 'Cargando… '+all.length+' productos';
+      cursor = d.pageInfo?.hasNextPage ? d.pageInfo.endCursor : null;
+    } while(cursor);
+    sections.products.items=all; load.style.display='none'; load.textContent='Cargando…';
+    renderProductTable(sections.products.items);
+  } catch(e){load.style.display='none';load.textContent='Cargando…';document.getElementById('p-list').innerHTML='<p class="empty-msg">Error cargando productos.</p>';}
 }
 
 function renderProductTable(products) {
