@@ -149,22 +149,44 @@ Responde SOLO con el texto del alt, sin comillas ni explicaciones. Idioma: espa�
 
 // ── PAINTING PARSER & SEO ─────────────────────────────────────────────────────
 
+// Quote chars (open / close) — straight, curly, guillemets, acute accent ´
+const Q_OPEN  = '\u2018\u201c\u00ab\u00b4\'"`';
+const Q_CLOSE = '\u2019\u201d\u00bb\'"`';
+const RE_Q_OPEN  = new RegExp('[' + Q_OPEN  + ']');
+const RE_QUOTE_STRICT = new RegExp('[' + Q_OPEN + '](.+?)[' + Q_CLOSE + ']+\\s*$', 's');
+const RE_QUOTE_OPEN   = new RegExp('[' + Q_OPEN + '](.+)$', 's');
+
 function parsePaintingTitle(title) {
   // Split on first dash (-, –, —) with optional surrounding spaces
   const dashMatch = title.match(/^(.+?)\s*[-–—]\s*(.+)$/s);
   if (!dashMatch) return null;
   const autor = dashMatch[1].trim();
-  const rest = dashMatch[2].trim();
+  const rest  = dashMatch[2].trim();
+
   // Year at end
   const yearMatch = rest.match(/\s(\d{4})\s*$/);
   const año = yearMatch ? yearMatch[1] : null;
-  const restNoYear = yearMatch ? rest.slice(0, yearMatch.index).trim() : rest;
-  // Theme in any quote style: straight ' " ` or curly \u2018\u2019\u201c\u201d or guillemets «»
-  const quoteMatch = restNoYear.match(/[\u2018\u201c\u00ab'"`]([^\u2019\u201d\u00bb'"`]+)[\u2019\u201d\u00bb'"`]+\s*$/);
-  if (!quoteMatch) return null;
-  const tematica = quoteMatch[1].trim();
-  const restNoTheme = restNoYear.slice(0, quoteMatch.index).trim();
-  // Technique + optional support
+  let restNoYear = yearMatch ? rest.slice(0, yearMatch.index).trim() : rest;
+
+  // Strip trailing parenthetical notes like (Copia), (Reproducción)
+  restNoYear = restNoYear.replace(/\s*\([^)]*\)\s*$/, '').trim();
+
+  // Theme: try strict match first (closing quote at end), then fallback for missing close quote
+  let quoteMatch = RE_QUOTE_STRICT.exec(restNoYear);
+  let tematica, restNoTheme;
+  if (quoteMatch) {
+    tematica    = quoteMatch[1].trim();
+    restNoTheme = restNoYear.slice(0, quoteMatch.index).trim();
+  } else if (RE_Q_OPEN.test(restNoYear)) {
+    // Missing closing quote — take everything after the opening quote
+    const openMatch = RE_QUOTE_OPEN.exec(restNoYear);
+    tematica    = openMatch[1].trim();
+    restNoTheme = restNoYear.slice(0, openMatch.index).trim();
+  } else {
+    return null;
+  }
+
+  // Technique + optional support (after "sobre")
   const sobreIdx = restNoTheme.toLowerCase().indexOf(' sobre ');
   let tecnica, soporte;
   if (sobreIdx !== -1) {
