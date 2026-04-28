@@ -183,7 +183,8 @@ function parsePaintingTitle(title) {
     tematica    = openMatch[1].trim();
     restNoTheme = restNoYear.slice(0, openMatch.index).trim();
   } else {
-    return null;
+    // No quotes found — partial parse: keep what we have, mark as unquoted
+    return { autor, raw: restNoYear, año, partial: true };
   }
 
   // Technique + optional support (after "sobre")
@@ -196,18 +197,39 @@ function parsePaintingTitle(title) {
     tecnica = restNoTheme;
     soporte = null;
   }
-  if (!autor || !tecnica || !tematica) return null;
+  if (!autor || !tematica) return null;
   return { autor, tecnica, soporte, tematica, año };
 }
 
 async function generatePaintingSEO(product, extraRules = '') {
   const parsed = parsePaintingTitle(product.title);
+  // No dash = can't identify author → manual review
   if (!parsed) {
-    throw new Error('Revisión manual requerida: el título no sigue el formato de pintura esperado (Autor - Técnica [sobre Soporte] \'Temática\' [Año]).');
+    throw new Error('Revisión manual requerida: no se pudo identificar el autor (falta guión separador).');
   }
-  const { autor, tecnica, soporte, tematica, año } = parsed;
 
-  const json = await callClaude(`${STORE_CONTEXT}
+  let json;
+
+  if (parsed.partial) {
+    // Title has no quotes — pass raw description to Claude, let it interpret
+    json = await callClaude(`${STORE_CONTEXT}
+
+PINTURA (título sin formato estándar):
+- Autor: ${parsed.autor}
+- Descripción del título: ${parsed.raw}${parsed.año ? ' (' + parsed.año + ')' : ''}
+
+El título no usa el formato estándar. Interpreta la descripción para generar el mejor SEO posible.
+INSTRUCCIONES:
+Metatítulo (máx 60 caracteres): formato FIJO → "[Autor] - [descripción breve de la obra]". Autor siempre primero.
+Metadescripción (máx 160 caracteres): texto natural con autor, técnica/temática inferida de la descripción. Incluye "pintura chilena" u "obra de arte chilena" si corresponde. Incluye "Santiago" o "Providencia" si cabe.
+No inventes datos que no estén en la descripción del título.
+
+${SEO_RULES}${extraBlock(extraRules)}
+
+Responde SOLO con JSON: {"metaTitle":"...","metaDescription":"..."}`);
+  } else {
+    const { autor, tecnica, soporte, tematica, año } = parsed;
+    json = await callClaude(`${STORE_CONTEXT}
 
 PINTURA:
 - Autor: ${autor}
