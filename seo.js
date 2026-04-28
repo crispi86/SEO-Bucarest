@@ -249,6 +249,7 @@ Si no hay soporte o año, NO los inventes ni los menciones.
 ${SEO_RULES}${extraBlock(extraRules)}
 
 Responde SOLO con JSON: {"metaTitle":"...","metaDescription":"..."}`);
+  }
 
   return {
     productId: product.id, productGid: product.gid, productTitle: product.title,
