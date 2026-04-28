@@ -159,8 +159,8 @@ function parsePaintingTitle(title) {
   const yearMatch = rest.match(/\s(\d{4})\s*$/);
   const año = yearMatch ? yearMatch[1] : null;
   const restNoYear = yearMatch ? rest.slice(0, yearMatch.index).trim() : rest;
-  // Theme in any quote style: straight ' " or curly \u2018\u2019\u201c\u201d or guillemets «»
-  const quoteMatch = restNoYear.match(/[\u2018\u201c\u00ab'"]([^\u2019\u201d\u00bb'"]+)[\u2019\u201d\u00bb'"]+\s*$/);
+  // Theme in any quote style: straight ' " ` or curly \u2018\u2019\u201c\u201d or guillemets «»
+  const quoteMatch = restNoYear.match(/[\u2018\u201c\u00ab'"`]([^\u2019\u201d\u00bb'"`]+)[\u2019\u201d\u00bb'"`]+\s*$/);
   if (!quoteMatch) return null;
   const tematica = quoteMatch[1].trim();
   const restNoTheme = restNoYear.slice(0, quoteMatch.index).trim();
