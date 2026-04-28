@@ -150,17 +150,21 @@ Responde SOLO con el texto del alt, sin comillas ni explicaciones. Idioma: espa�
 // ── PAINTING PARSER & SEO ─────────────────────────────────────────────────────
 
 function parsePaintingTitle(title) {
-  const dashIdx = title.indexOf(' - ');
-  if (dashIdx === -1) return null;
-  const autor = title.slice(0, dashIdx).trim();
-  const rest = title.slice(dashIdx + 3).trim();
+  // Split on first dash (-, –, —) with optional surrounding spaces
+  const dashMatch = title.match(/^(.+?)\s*[-–—]\s*(.+)$/s);
+  if (!dashMatch) return null;
+  const autor = dashMatch[1].trim();
+  const rest = dashMatch[2].trim();
+  // Year at end
   const yearMatch = rest.match(/\s(\d{4})\s*$/);
   const año = yearMatch ? yearMatch[1] : null;
   const restNoYear = yearMatch ? rest.slice(0, yearMatch.index).trim() : rest;
-  const quoteMatch = restNoYear.match(/'([^']+)'\s*$/);
+  // Theme in any quote style: straight ' " or curly \u2018\u2019\u201c\u201d or guillemets «»
+  const quoteMatch = restNoYear.match(/[\u2018\u201c\u00ab'"]([^\u2019\u201d\u00bb'"]+)[\u2019\u201d\u00bb'"]+\s*$/);
   if (!quoteMatch) return null;
-  const tematica = quoteMatch[1];
+  const tematica = quoteMatch[1].trim();
   const restNoTheme = restNoYear.slice(0, quoteMatch.index).trim();
+  // Technique + optional support
   const sobreIdx = restNoTheme.toLowerCase().indexOf(' sobre ');
   let tecnica, soporte;
   if (sobreIdx !== -1) {
