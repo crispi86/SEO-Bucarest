@@ -147,4 +147,67 @@ Responde SOLO con el texto del alt, sin comillas ni explicaciones. Idioma: espa�
   return response.content[0].text.trim().replace(/^["']|["']$/g, '').substring(0, 120);
 }
 
-module.exports = { generateSEO, generateCollectionSEO, generateMetaobjectSEO, generateArticleSEO, generateAltText };
+// ── PAINTING PARSER & SEO ─────────────────────────────────────────────────────
+
+function parsePaintingTitle(title) {
+  const dashIdx = title.indexOf(' - ');
+  if (dashIdx === -1) return null;
+  const autor = title.slice(0, dashIdx).trim();
+  const rest = title.slice(dashIdx + 3).trim();
+  const yearMatch = rest.match(/\s(\d{4})\s*$/);
+  const año = yearMatch ? yearMatch[1] : null;
+  const restNoYear = yearMatch ? rest.slice(0, yearMatch.index).trim() : rest;
+  const quoteMatch = restNoYear.match(/'([^']+)'\s*$/);
+  if (!quoteMatch) return null;
+  const tematica = quoteMatch[1];
+  const restNoTheme = restNoYear.slice(0, quoteMatch.index).trim();
+  const sobreIdx = restNoTheme.toLowerCase().indexOf(' sobre ');
+  let tecnica, soporte;
+  if (sobreIdx !== -1) {
+    tecnica = restNoTheme.slice(0, sobreIdx).trim();
+    soporte = restNoTheme.slice(sobreIdx + 7).trim();
+  } else {
+    tecnica = restNoTheme;
+    soporte = null;
+  }
+  if (!autor || !tecnica || !tematica) return null;
+  return { autor, tecnica, soporte, tematica, año };
+}
+
+async function generatePaintingSEO(product, extraRules = '') {
+  const parsed = parsePaintingTitle(product.title);
+  if (!parsed) {
+    throw new Error('Revisión manual requerida: el título no sigue el formato de pintura esperado (Autor - Técnica [sobre Soporte] \'Temática\' [Año]).');
+  }
+  const { autor, tecnica, soporte, tematica, año } = parsed;
+
+  const json = await callClaude(`${STORE_CONTEXT}
+
+PINTURA:
+- Autor: ${autor}
+- Técnica: ${tecnica}
+- Soporte: ${soporte || '(no especificado, no inventar)'}
+- Temática: ${tematica}
+- Año: ${año || '(no especificado, no inventar)'}
+
+INSTRUCCIONES ESPECÍFICAS PARA PINTURAS:
+Metatítulo (máx 60 caracteres): sigue este formato → "[Temática] - [Autor] - Pintura [Técnica]"
+Si el autor es muy conocido en Chile, puede ir primero. Usa lenguaje cotidiano.
+Metadescripción (máx 160 caracteres): texto natural que incluya técnica${soporte ? ', soporte' : ''}${año ? ', año' : ''}, autor y temática.
+Suma términos de búsqueda: "pintura chilena" o "obra de arte chilena" según corresponda.
+Incluye "Santiago" o "Providencia" si cabe naturalmente.
+Si no hay soporte o año, NO los inventes ni los menciones.
+
+${SEO_RULES}${extraBlock(extraRules)}
+
+Responde SOLO con JSON: {"metaTitle":"...","metaDescription":"..."}`);
+
+  return {
+    productId: product.id, productGid: product.gid, productTitle: product.title,
+    currentMetaTitle: product.currentMetaTitle, currentMetaDescription: product.currentMetaDescription,
+    metaTitle: (json.metaTitle || '').substring(0, 60),
+    metaDescription: (json.metaDescription || '').substring(0, 160),
+  };
+}
+
+module.exports = { generateSEO, generateCollectionSEO, generateMetaobjectSEO, generateArticleSEO, generateAltText, generatePaintingSEO };

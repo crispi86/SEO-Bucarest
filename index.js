@@ -219,7 +219,9 @@ app.get('/api/seo/stream/:jobId', async (req, res) => {
     ping();
     try {
       let result;
-      if (type === 'products') result = await seo.generateSEO(item, buildRules('products'));
+      if (type === 'products') result = item.isPainting
+        ? await seo.generatePaintingSEO(item, buildRules('products'))
+        : await seo.generateSEO(item, buildRules('products'));
       else if (type === 'collections') result = await seo.generateCollectionSEO(item, buildRules('collections'));
       else if (type === 'metaobjects') result = await seo.generateMetaobjectSEO(item, buildRules('metaobjects'));
       else if (type === 'articles') result = await seo.generateArticleSEO(item, buildRules('articles'));
@@ -420,6 +422,7 @@ function adminUI(host) {
     <div id="pf-tag" class="filter-panel"><label>Tag<input id="p-tag" placeholder="Ej: pintura" oninput="debounce(loadProducts,600)"></label></div>
     <div id="pf-title" class="filter-panel"><label>Título contiene<input id="p-title" placeholder="Ej: silla" oninput="debounce(loadProducts,600)"></label></div>
     <div id="p-loading" class="empty-msg" style="display:none">Cargando…</div>
+    <div id="p-painting-badge" style="display:none;margin:8px 0;padding:7px 12px;background:#fdf8f0;border:1px solid #e8d8b0;color:#7a5c1a;font-size:11px;letter-spacing:0.04em">🎨 Colección de pinturas detectada — se usará lógica especializada para metatítulos y metadescripciones.</div>
     <div id="p-extra-filters" style="display:none">
       <div style="display:flex;gap:24px;flex-wrap:wrap;margin:10px 0;padding:10px 0;border-top:1px solid #f0ece6">
         <div>
@@ -692,7 +695,7 @@ function adminUI(host) {
 <script>
 // ── State ─────────────────────────────────────────────────────────────────────
 const sections = {
-  products:    { prefix:'p',   items:[], results:[], seoFilter:'all', metaFilter:'all', statusFilter:'all', stockFilter:'all', urlFilter:'all', descFilter:'all' },
+  products:    { prefix:'p',   items:[], results:[], seoFilter:'all', metaFilter:'all', statusFilter:'all', stockFilter:'all', urlFilter:'all', descFilter:'all', isPainting:false },
   collections: { prefix:'c',   items:[], results:[], seoFilter:'all', metaFilter:'all' },
   metaobjects: { prefix:'mo',  items:[], results:[], seoFilter:'all', metaFilter:'all' },
   articles:    { prefix:'art', items:[], results:[], seoFilter:'all', metaFilter:'all' },
@@ -703,6 +706,7 @@ let changedUrlIds = { products:new Set(), collections:new Set() };
 let pFilterType = 'collection';
 let imgFilterType = 'collection';
 const SHOP = '${shopDomain}';
+const PAINTING_COLLECTIONS = ['chilena contemporánea','chilena clásica','europea clásica','extranjera contemporánea','religiosa'];
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
@@ -812,8 +816,8 @@ function setPF(type, btn) {
   document.querySelectorAll('#pf-filters .filter-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
   document.querySelectorAll('[id^="pf-"]').forEach(p=>p.classList.remove('active'));
   document.getElementById('pf-'+type).classList.add('active');
-  sections.products.items=[]; sections.products.seoFilter='all'; sections.products.metaFilter='all'; sections.products.statusFilter='all'; sections.products.stockFilter='all';
-  document.getElementById('p-list').innerHTML=''; document.getElementById('p-count').textContent=''; document.getElementById('p-selall').style.display='none'; document.getElementById('p-sel-noseo').style.display='none'; document.getElementById('p-extra-filters').style.display='none';
+  sections.products.items=[]; sections.products.seoFilter='all'; sections.products.metaFilter='all'; sections.products.statusFilter='all'; sections.products.stockFilter='all'; sections.products.isPainting=false;
+  document.getElementById('p-list').innerHTML=''; document.getElementById('p-count').textContent=''; document.getElementById('p-selall').style.display='none'; document.getElementById('p-sel-noseo').style.display='none'; document.getElementById('p-extra-filters').style.display='none'; document.getElementById('p-painting-badge').style.display='none';
   document.querySelectorAll('#p-seo-filter .seo-filter-btn, #p-seo-filter-top .seo-filter-btn').forEach(b => b.classList.toggle('active', b.dataset.f === 'all'));
   ['p-status-filter','p-stock-filter'].forEach(id => document.querySelectorAll('#'+id+' .seo-filter-btn').forEach((b,i)=>{b.classList.toggle('active',i===0);}));
   afterSelChange('p');
@@ -879,6 +883,14 @@ async function loadProducts() {
       cursor = d.pageInfo?.hasNextPage ? d.pageInfo.endCursor : null;
     } while(cursor);
     sections.products.items=all; load.style.display='none'; load.textContent='Cargando…';
+    sections.products.isPainting = false;
+    const paintingBadge = document.getElementById('p-painting-badge');
+    if (pFilterType === 'collection') {
+      const sel = document.getElementById('p-col');
+      const colName = (sel.options[sel.selectedIndex]?.textContent || '').toLowerCase().trim();
+      sections.products.isPainting = PAINTING_COLLECTIONS.some(n => colName.includes(n));
+    }
+    if (paintingBadge) paintingBadge.style.display = sections.products.isPainting ? 'block' : 'none';
     renderProductTable(sections.products.items);
   } catch(e){load.style.display='none';load.textContent='Cargando…';document.getElementById('p-list').innerHTML='<p class="empty-msg">Error cargando productos.</p>';}
 }
@@ -1118,7 +1130,8 @@ const nameMap = { products:'p_item', collections:'c_item', metaobjects:'mo_item'
 async function startGen(type) {
   const prefix = typeMap[type];
   const checkboxes = Array.from(document.querySelectorAll('[name="'+nameMap[type]+'"]:checked'));
-  const allItems = checkboxes.map(c => JSON.parse(c.dataset.obj));
+  const isPainting = type === 'products' && sections.products.isPainting;
+  const allItems = checkboxes.map(c => { const o = JSON.parse(c.dataset.obj); if (isPainting) o.isPainting = true; return o; });
   if (!allItems.length) return;
 
   const oneTimeRules = (document.getElementById(prefix+'-one-time-rules')?.value || '').trim();
