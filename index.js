@@ -454,6 +454,14 @@ function adminUI(host) {
             <button class="seo-filter-btn" data-mf="complete" onclick="setMetaFilter('products','complete',this)">Completo</button>
           </div>
         </div>
+        <div>
+          <div style="font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:#aaa;margin-bottom:6px">URL</div>
+          <div class="seo-filter" id="p-url-filter">
+            <button class="seo-filter-btn active" onclick="setPUrlFilter('all',this)">Todos</button>
+            <button class="seo-filter-btn" onclick="setPUrlFilter('done',this)">URL actualizada</button>
+            <button class="seo-filter-btn" onclick="setPUrlFilter('pending',this)">Sin actualizar</button>
+          </div>
+        </div>
       </div>
     </div>
     <div id="p-list"></div>
@@ -465,8 +473,10 @@ function adminUI(host) {
   </div>
   <div class="btn-row">
     <button class="btn btn-primary" id="p-gen-btn" onclick="startGen('products')" disabled>Generar SEO con Claude</button>
+    <button class="btn btn-secondary" id="p-url-btn" onclick="bulkUpdateURLs('products')" disabled>Actualizar URLs seleccionadas</button>
     <span class="btn-hint" id="p-hint">Seleccione productos</span>
   </div>
+  <div id="p-url-prog" style="display:none;margin-top:12px"><div class="progress-bar"><div class="progress-fill" id="p-url-pfill"></div></div><div class="progress-lbl" id="p-url-plbl"></div></div>
   <div class="progress-wrap" id="p-prog"><div class="progress-bar"><div class="progress-fill" id="p-pfill"></div></div><div class="progress-lbl" id="p-plbl"></div></div>
   <div class="results-section" id="p-results">
     <h2>Propuestas</h2><p class="results-subtitle" id="p-rsub"></p>
@@ -674,7 +684,7 @@ function adminUI(host) {
 <script>
 // ── State ─────────────────────────────────────────────────────────────────────
 const sections = {
-  products:    { prefix:'p',   items:[], results:[], seoFilter:'all', metaFilter:'all', statusFilter:'all', stockFilter:'all' },
+  products:    { prefix:'p',   items:[], results:[], seoFilter:'all', metaFilter:'all', statusFilter:'all', stockFilter:'all', urlFilter:'all' },
   collections: { prefix:'c',   items:[], results:[], seoFilter:'all', metaFilter:'all' },
   metaobjects: { prefix:'mo',  items:[], results:[], seoFilter:'all', metaFilter:'all' },
   articles:    { prefix:'art', items:[], results:[], seoFilter:'all', metaFilter:'all' },
@@ -767,8 +777,10 @@ function toggleRow(tr, prefix) {
 function afterSelChange(prefix) {
   const n = updateSelCount(prefix);
   const genBtn = document.getElementById(prefix+'-gen-btn');
+  const urlBtn = document.getElementById(prefix+'-url-btn');
   const hint = document.getElementById(prefix+'-hint');
   if (genBtn) { genBtn.disabled = !n; if(hint) hint.textContent = n ? n+' elemento(s) listo(s)' : 'Seleccione elementos'; }
+  if (urlBtn) urlBtn.disabled = !n;
 }
 
 function showSectionMsg(prefix, text, type) {
@@ -830,6 +842,12 @@ function setPStockFilter(f, btn) {
   renderProductTable(sections.products.items);
 }
 
+function setPUrlFilter(f, btn) {
+  sections.products.urlFilter = f;
+  document.querySelectorAll('#p-url-filter .seo-filter-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
+  renderProductTable(sections.products.items);
+}
+
 async function loadProducts() {
   const load = document.getElementById('p-loading');
   load.style.display='block'; document.getElementById('p-list').innerHTML=''; sections.products.items=[];
@@ -842,7 +860,7 @@ async function loadProducts() {
 }
 
 function renderProductTable(products) {
-  const { seoFilter, metaFilter, statusFilter, stockFilter } = sections.products;
+  const { seoFilter, metaFilter, statusFilter, stockFilter, urlFilter } = sections.products;
   let filtered = products;
   if (seoFilter === 'done')   filtered = filtered.filter(p => processedIds.products.has(p.id));
   else if (seoFilter === 'none') filtered = filtered.filter(p => !processedIds.products.has(p.id));
@@ -852,6 +870,8 @@ function renderProductTable(products) {
   else if (statusFilter === 'draft') filtered = filtered.filter(p => p.status !== 'active');
   if (stockFilter === 'available') filtered = filtered.filter(p => p.totalInventory > 0);
   else if (stockFilter === 'soldout') filtered = filtered.filter(p => p.totalInventory <= 0);
+  if (urlFilter === 'done')    filtered = filtered.filter(p => changedUrlIds.products.has(p.gid));
+  else if (urlFilter === 'pending') filtered = filtered.filter(p => !changedUrlIds.products.has(p.gid));
 
   const list=document.getElementById('p-list');
   const extraFilters=document.getElementById('p-extra-filters');
@@ -1309,6 +1329,38 @@ function generateSlug(text) {
     .replace(/[^a-z0-9\\s]/g,' ').trim()
     .split(/\\s+/).filter(w=>w&&!STOP.has(w))
     .slice(0,6).join('-') || 'sin-titulo';
+}
+
+async function bulkUpdateURLs(type) {
+  const prefix = typeMap[type];
+  const checkboxes = Array.from(document.querySelectorAll('[name="'+nameMap[type]+'"]:checked'));
+  const items = checkboxes.map(c => JSON.parse(c.dataset.obj)).filter(p => p.currentMetaTitle);
+  if (!items.length) { showSectionMsg(prefix, 'Los productos seleccionados no tienen metatítulo aún.', 'err'); return; }
+  const prog = document.getElementById(prefix+'-url-prog');
+  const fill = document.getElementById(prefix+'-url-pfill');
+  const lbl  = document.getElementById(prefix+'-url-plbl');
+  const btn  = document.getElementById(prefix+'-url-btn');
+  btn.disabled = true; prog.style.display = 'block';
+  let ok = 0, errors = 0;
+  for (let i = 0; i < items.length; i++) {
+    const p = items[i];
+    lbl.textContent = 'Actualizando '+(i+1)+' de '+items.length+': '+p.title;
+    fill.style.width = Math.round((i+1)/items.length*100)+'%';
+    const newHandle = generateSlug(p.currentMetaTitle);
+    try {
+      const res = await fetch('/api/url/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type, gid:p.gid, oldHandle:p.handle, newHandle})}).then(r=>r.json());
+      if (res.error) throw new Error(res.error);
+      if (changedUrlIds[type]) changedUrlIds[type].add(p.gid);
+      p.handle = res.handle;
+      const updBtn = document.getElementById('url-btn-'+prefix+'-'+p.id);
+      if (updBtn) { updBtn.textContent='✓'; updBtn.classList.add('url-upd-done'); }
+      ok++;
+    } catch(e) { errors++; }
+    await new Promise(r => setTimeout(r, 200));
+  }
+  prog.style.display = 'none'; btn.disabled = false;
+  showSectionMsg(prefix, ok+' URL(s) actualizada(s)'+(errors?' — '+errors+' error(s)':''), errors?'err':'ok');
+  renderProductTable(sections.products.items);
 }
 
 function startURLEdit(btn) {
