@@ -203,10 +203,8 @@ function parsePaintingTitle(title) {
 
 async function generatePaintingSEO(product, extraRules = '') {
   const parsed = parsePaintingTitle(product.title);
-  // No dash = can't identify author → manual review
-  if (!parsed) {
-    throw new Error('Revisión manual requerida: no se pudo identificar el autor (falta guión separador).');
-  }
+  // No dash = not a painting format → fall back to regular product SEO
+  if (!parsed) return generateSEO(product, extraRules);
 
   let json;
 
