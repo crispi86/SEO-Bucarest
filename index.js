@@ -289,9 +289,9 @@ const FURNITURE_RULES = `REGLAS ESPECIALES PARA MUEBLES ANTIGUOS:
 • Metatítulo: orden FIJO → [nombre del mueble] [antiguo/antigua] [origen] [material] [estilo]. Ejemplo: "Cómoda antigua francesa de madera Luis XVI".
 • "antiguo" o "antigua" SIEMPRE presente, salvo que sea explícitamente contemporáneo.
 • Origen si disponible: "francés", "inglés", "italiano", etc.
-• Material si aplica: "de madera", "de roble", etc.
-• Estilo al final: léelo DIRECTAMENTE del título del producto — si dice "estilo Transición", usa "Transición"; si dice "estilo Sheraton", usa "Sheraton". Nunca lo inventes ni lo cambies por un término genérico. Estilos posibles: Napoleón III, Luis XVI, Luis XV, Normando, Provenzal, Regencia, Transición, Sheraton, Victoriano, Hepplewhite, Chippendale, etc.
-• NUNCA incluir medidas ni dimensiones en el metatítulo.
+• Material si aplica: "de madera", "de roble", "en caoba", etc.
+• Estilo al final: búscalo DIRECTAMENTE en el título del producto. Puede aparecer como "estilo Luis XV", "estilo Transición", o simplemente "Luis XV", "Napoleón III" sin la palabra "estilo". Estilos reconocibles: Napoleón III, Luis XVI, Luis XV, Normando, Provenzal, Regencia, Transición, Sheraton, Victoriano, Hepplewhite, Chippendale, Art Nouveau, Art Déco, etc. Si está en el título, ÚSALO tal cual. Nunca lo inventes ni lo reemplaces por un término genérico como "clásico" o "antiguo".
+• NUNCA incluir medidas, dimensiones ni centímetros en el metatítulo, aunque aparezcan en el título o la descripción del producto.
 • Metadescripción: desarrollar origen, estilo, material y antigüedad con lenguaje elegante. Las medidas pueden mencionarse aquí si aportan valor.`;
 
 // ── Start ─────────────────────────────────────────────────────────────────────
