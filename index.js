@@ -290,7 +290,7 @@ const FURNITURE_RULES = `REGLAS ESPECIALES PARA MUEBLES ANTIGUOS:
 • "antiguo" o "antigua" SIEMPRE presente, salvo que sea explícitamente contemporáneo.
 • Origen si disponible: "francés", "inglés", "italiano", etc.
 • Material si aplica: "de madera", "de roble", etc.
-• Estilo al final si disponible: Napoleón III, Luis XVI, Luis XV, Normando, Provenzal, Regencia, Transición, Victoriano, etc.
+• Estilo al final: léelo DIRECTAMENTE del título del producto — si dice "estilo Transición", usa "Transición"; si dice "estilo Sheraton", usa "Sheraton". Nunca lo inventes ni lo cambies por un término genérico. Estilos posibles: Napoleón III, Luis XVI, Luis XV, Normando, Provenzal, Regencia, Transición, Sheraton, Victoriano, Hepplewhite, Chippendale, etc.
 • NUNCA incluir medidas ni dimensiones en el metatítulo.
 • Metadescripción: desarrollar origen, estilo, material y antigüedad con lenguaje elegante. Las medidas pueden mencionarse aquí si aportan valor.`;
 
