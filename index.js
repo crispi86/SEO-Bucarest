@@ -287,10 +287,11 @@ app.post('/api/seo/apply', async (req, res) => {
 
 const FURNITURE_RULES = `REGLAS ESPECIALES PARA MUEBLES ANTIGUOS:
 • Metatítulo: incluir SIEMPRE "antiguo" o "antigua", salvo que el producto sea explícitamente contemporáneo.
-• Metatítulo: mencionar "de madera" si aplica al material.
+• Metatítulo: incluir el estilo si está disponible — es PRIORITARIO: Napoleón III, Luis XVI, Luis XV, Normando, Provenzal, Regencia, Transición, Victoriano, etc.
 • Metatítulo: incluir el origen si está disponible: "francés", "inglés", "italiano", etc.
-• Metatítulo: si cabe, incluir el estilo: Luis XVI, Luis XV, Napoleón III, Victoriano, etc.
-• Metadescripción: desarrollar origen, estilo, material y antigüedad con lenguaje elegante.`;
+• Metatítulo: mencionar "de madera" si aplica al material.
+• Metatítulo: NUNCA incluir medidas ni dimensiones.
+• Metadescripción: desarrollar origen, estilo, material y antigüedad con lenguaje elegante. Las medidas pueden mencionarse aquí si aportan valor.`;
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
