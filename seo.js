@@ -274,12 +274,12 @@ MUEBLE:
 ${styleRule}
 
 METATÍTULO — máx 60 caracteres, orden FIJO:
-[nombre del mueble] + [antiguo/antigua] + [origen: francesa/inglés/etc.] + [material: de madera/en caoba/etc.] + [estilo si aplica]
-Ejemplos: "Cómoda antigua francesa de madera Luis XVI" / "Vitrina antigua inglesa de roble Victoriano"
+[nombre del mueble] + [antiguo/antigua] + [origen: francesa/inglés/etc.] + [material: de madera/en caoba/etc.] + [estilo + nombre estilo si aplica]
+Ejemplos: "Cómoda antigua francesa de madera estilo Luis XVI" / "Vitrina antigua inglesa de roble estilo Victoriano"
 NUNCA incluir medidas, dimensiones ni números de cm.
 
 METADESCRIPCIÓN — máx 160 caracteres:
-Texto natural y elegante. Menciona origen, estilo, material y antigüedad. Las medidas pueden ir aquí si aportan valor.
+Texto natural y elegante. DEBE incluir "antigua" o "antiguo" y "de madera". Si el producto también tiene mármol, bronce o cuero, menciónalos además. Menciona origen, estilo y antigüedad. Las medidas pueden ir aquí si aportan valor.
 
 ${SEO_RULES}${extraBlock(extraRules)}
 
