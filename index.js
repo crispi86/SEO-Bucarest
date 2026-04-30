@@ -220,7 +220,12 @@ app.get('/api/seo/stream/:jobId', async (req, res) => {
     try {
       let result;
       if (type === 'products') {
-        const baseRules = buildRules('products') + (item.isFurniture ? '\n' + FURNITURE_RULES : '');
+        let baseRules = buildRules('products');
+        if (item.isFurniture) {
+          const style = detectFurnitureStyle(item.title || '');
+          baseRules += '\n' + FURNITURE_RULES;
+          if (style) baseRules += `\nESTILO DETECTADO EN EL TÍTULO: "${style}" — inclúyelo EXACTAMENTE así al final del metatítulo, sin cambiarlo.`;
+        }
         result = item.isPainting
           ? await seo.generatePaintingSEO(item, baseRules)
           : await seo.generateSEO(item, baseRules);
@@ -285,12 +290,24 @@ app.post('/api/seo/apply', async (req, res) => {
   res.json({ applied, errors });
 });
 
+const FURNITURE_STYLES = [
+  'Luis XV','Luis XVI','Transicion','Transición','Regencia','Sheraton',
+  'Georgian','Victoriano','Directorio','Edwardian','Louis Philippe',
+  'Imperio','Napoleon III','Napoleón III','Normando','Provenzal',
+  'Neogotico','Neogótico','Modernismo','Carlos X',
+];
+function detectFurnitureStyle(title) {
+  const norm = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const t = norm(title);
+  return FURNITURE_STYLES.find(s => t.includes(norm(s))) || null;
+}
+
 const FURNITURE_RULES = `REGLAS ESPECIALES PARA MUEBLES ANTIGUOS:
 • Metatítulo: orden FIJO → [nombre del mueble] [antiguo/antigua] [origen] [material] [estilo]. Ejemplo: "Cómoda antigua francesa de madera Luis XVI".
 • "antiguo" o "antigua" SIEMPRE presente, salvo que sea explícitamente contemporáneo.
 • Origen si disponible: "francés", "inglés", "italiano", etc.
 • Material si aplica: "de madera", "de roble", "en caoba", etc.
-• Estilo al final: búscalo DIRECTAMENTE en el título del producto. Puede aparecer como "estilo Luis XV", "estilo Transición", o simplemente "Luis XV", "Napoleón III" sin la palabra "estilo". Estilos reconocibles: Napoleón III, Luis XVI, Luis XV, Normando, Provenzal, Regencia, Transición, Sheraton, Victoriano, Hepplewhite, Chippendale, Art Nouveau, Art Déco, etc. Si está en el título, ÚSALO tal cual. Nunca lo inventes ni lo reemplaces por un término genérico como "clásico" o "antiguo".
+• Estilo al final del metatítulo: si se te indica el estilo detectado, inclúyelo exactamente. Si no se indica, no lo inventes.
 • NUNCA incluir medidas, dimensiones ni centímetros en el metatítulo, aunque aparezcan en el título o la descripción del producto.
 • Metadescripción: desarrollar origen, estilo, material y antigüedad con lenguaje elegante. Las medidas pueden mencionarse aquí si aportan valor.`;
 
