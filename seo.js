@@ -257,4 +257,40 @@ Responde SOLO con JSON: {"metaTitle":"...","metaDescription":"..."}`);
   };
 }
 
-module.exports = { generateSEO, generateCollectionSEO, generateMetaobjectSEO, generateArticleSEO, generateAltText, generatePaintingSEO };
+async function generateFurnitureSEO(product, detectedStyle, extraRules = '') {
+  const styleRule = detectedStyle
+    ? `ESTILO OBLIGATORIO: "${detectedStyle}" — esta palabra EXACTA debe aparecer al final del metatítulo. No la cambies, no la omitas.`
+    : 'No se detectó estilo — no inventes ninguno.';
+
+  const tags = Array.isArray(product.tags) ? product.tags.join(', ') : (product.tags || '');
+
+  const json = await callClaude(`${STORE_CONTEXT}
+
+MUEBLE:
+- Título: ${product.title}
+- Descripción: ${product.description || '(sin descripción)'}
+- Tags: ${tags || '(sin tags)'}
+
+${styleRule}
+
+METATÍTULO — máx 60 caracteres, orden FIJO:
+[nombre del mueble] + [antiguo/antigua] + [origen: francesa/inglés/etc.] + [material: de madera/en caoba/etc.] + [estilo si aplica]
+Ejemplos: "Cómoda antigua francesa de madera Luis XVI" / "Vitrina antigua inglesa de roble Victoriano"
+NUNCA incluir medidas, dimensiones ni números de cm.
+
+METADESCRIPCIÓN — máx 160 caracteres:
+Texto natural y elegante. Menciona origen, estilo, material y antigüedad. Las medidas pueden ir aquí si aportan valor.
+
+${SEO_RULES}${extraBlock(extraRules)}
+
+Responde SOLO con JSON: {"metaTitle":"...","metaDescription":"..."}`);
+
+  return {
+    productId: product.id, productGid: product.gid, productTitle: product.title,
+    currentMetaTitle: product.currentMetaTitle, currentMetaDescription: product.currentMetaDescription,
+    metaTitle: (json.metaTitle || '').substring(0, 60),
+    metaDescription: (json.metaDescription || '').substring(0, 160),
+  };
+}
+
+module.exports = { generateSEO, generateCollectionSEO, generateMetaobjectSEO, generateArticleSEO, generateAltText, generatePaintingSEO, generateFurnitureSEO };

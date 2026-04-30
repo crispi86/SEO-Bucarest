@@ -220,15 +220,14 @@ app.get('/api/seo/stream/:jobId', async (req, res) => {
     try {
       let result;
       if (type === 'products') {
-        let baseRules = buildRules('products');
         if (item.isFurniture) {
           const style = detectFurnitureStyle(item.title || '');
-          baseRules += '\n' + FURNITURE_RULES;
-          if (style) baseRules += `\nESTILO DETECTADO EN EL TÍTULO: "${style}" — inclúyelo EXACTAMENTE así al final del metatítulo, sin cambiarlo.`;
+          result = await seo.generateFurnitureSEO(item, style, buildRules('products'));
+        } else {
+          result = item.isPainting
+            ? await seo.generatePaintingSEO(item, buildRules('products'))
+            : await seo.generateSEO(item, buildRules('products'));
         }
-        result = item.isPainting
-          ? await seo.generatePaintingSEO(item, baseRules)
-          : await seo.generateSEO(item, baseRules);
       }
       else if (type === 'collections') result = await seo.generateCollectionSEO(item, buildRules('collections'));
       else if (type === 'metaobjects') result = await seo.generateMetaobjectSEO(item, buildRules('metaobjects'));
