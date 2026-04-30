@@ -736,7 +736,12 @@ let pFilterType = 'collection';
 let imgFilterType = 'collection';
 const SHOP = '${shopDomain}';
 const PAINTING_COLLECTIONS  = ['chilena contemporánea','chilena clásica','europea clásica','extranjera contemporánea','religiosa'];
-const FURNITURE_COLLECTIONS = ['muebl'];
+const FURNITURE_COLLECTIONS = [
+  'muebl','comoda','tocador','silla','sillon','sitial',
+  'velador','escritorio','secretaire','chiffonier',
+  'vitrina','librero','estante','costurero',
+  'mesas de','mesas y','mesa de salon','mesa de comedor',
+];
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
