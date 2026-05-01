@@ -291,6 +291,21 @@ app.post('/api/seo/apply', async (req, res) => {
   res.json({ applied, errors });
 });
 
+// ── Webhook Registration ──────────────────────────────────────────────────────
+app.post('/api/webhook/register', requireAuth, async (req, res) => {
+  const https = require('https');
+  const address = 'https://web-production-6e1e0.up.railway.app/api/webhook/products/create';
+  const body = JSON.stringify({ webhook: { topic: 'products/create', address, format: 'json' } });
+  const result = await new Promise((resolve, reject) => {
+    const r = https.request({
+      hostname: SHOP(), path: '/admin/api/2024-01/webhooks.json', method: 'POST',
+      headers: { 'X-Shopify-Access-Token': TOKEN(), 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+    }, resp => { let d=''; resp.on('data',c=>d+=c); resp.on('end',()=>{ try{resolve(JSON.parse(d));}catch(e){reject(e);} }); });
+    r.on('error', reject); r.write(body); r.end();
+  });
+  res.json(result);
+});
+
 // ── Pending Products (webhook) ────────────────────────────────────────────────
 app.post('/api/webhook/products/create', express.raw({ type: 'application/json' }), (req, res) => {
   const secret = process.env.SHOPIFY_WEBHOOK_SECRET;
