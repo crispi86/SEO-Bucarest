@@ -313,15 +313,9 @@ app.post('/api/webhook/register', requireAuth, async (req, res) => {
 });
 
 // ── Pending Products (webhook) ────────────────────────────────────────────────
-app.post('/api/webhook/products/create', express.raw({ type: 'application/json' }), (req, res) => {
-  const secret = process.env.SHOPIFY_WEBHOOK_SECRET;
-  if (secret) {
-    const hmac = req.headers['x-shopify-hmac-sha256'];
-    const digest = crypto.createHmac('sha256', secret).update(req.body).digest('base64');
-    if (hmac !== digest) return res.status(401).send('Unauthorized');
-  }
+app.post('/api/webhook/products/create', (req, res) => {
   try {
-    const p = JSON.parse(req.body);
+    const p = req.body;
     if (!pendingProducts.find(x => x.id === String(p.id))) {
       pendingProducts.push({
         id: String(p.id),
