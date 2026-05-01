@@ -387,6 +387,7 @@ async function createRedirect(path, target) {
 }
 
 module.exports = {
+  graphqlRequest,
   getProductsByCollection, getProductsByQuery, updateProductSEO,
   getCollections, getCollectionsWithSEO, updateCollectionSEO,
   getMetaobjectTypes, getMetaobjectsByType, updateMetaobjectSEO,

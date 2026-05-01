@@ -293,17 +293,23 @@ app.post('/api/seo/apply', async (req, res) => {
 
 // ── Webhook Registration ──────────────────────────────────────────────────────
 app.post('/api/webhook/register', requireAuth, async (req, res) => {
-  const https = require('https');
-  const address = 'https://web-production-6e1e0.up.railway.app/api/webhook/products/create';
-  const body = JSON.stringify({ webhook: { topic: 'products/create', address, format: 'json' } });
-  const result = await new Promise((resolve, reject) => {
-    const r = https.request({
-      hostname: SHOP(), path: '/admin/api/2024-01/webhooks.json', method: 'POST',
-      headers: { 'X-Shopify-Access-Token': TOKEN(), 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
-    }, resp => { let d=''; resp.on('data',c=>d+=c); resp.on('end',()=>{ try{resolve(JSON.parse(d));}catch(e){reject(e);} }); });
-    r.on('error', reject); r.write(body); r.end();
-  });
-  res.json(result);
+  try {
+    const address = 'https://web-production-6e1e0.up.railway.app/api/webhook/products/create';
+    const result = await shopify.graphqlRequest(`
+      mutation {
+        webhookSubscriptionCreate(
+          topic: PRODUCTS_CREATE
+          webhookSubscription: { format: JSON, callbackUrl: "${address}" }
+        ) {
+          webhookSubscription { id }
+          userErrors { field message }
+        }
+      }
+    `);
+    const errors = result?.data?.webhookSubscriptionCreate?.userErrors || [];
+    if (errors.length) return res.json({ error: errors.map(e => e.message).join(', ') });
+    res.json({ ok: true, id: result?.data?.webhookSubscriptionCreate?.webhookSubscription?.id });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 // ── Pending Products (webhook) ────────────────────────────────────────────────
