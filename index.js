@@ -29,7 +29,7 @@ app.get('/admin', requireAuth, (req, res) => {
 });
 
 // ── Persistence ───────────────────────────────────────────────────────────────
-let store = { processedIds: { products: [], collections: [], metaobjects: [], articles: [], images: [] }, history: [], settings: { extraRules: '' } };
+let store = { processedIds: { products: [], collections: [], metaobjects: [], articles: [], images: [] }, history: [], settings: { extraRules: '' }, pendingProducts: [] };
 try {
   const raw = JSON.parse(fs.readFileSync('./log.json', 'utf8'));
   if (Array.isArray(raw)) {
@@ -53,6 +53,7 @@ const changedUrls = {
 };
 let history = store.history || [];
 let settings = { extraRules: '', rules: [], ...(store.settings || {}) };
+let pendingProducts = store.pendingProducts || [];
 
 function saveStore() {
   const data = {
@@ -60,6 +61,7 @@ function saveStore() {
     changedUrls: { products: [...changedUrls.products], collections: [...changedUrls.collections] },
     history,
     settings,
+    pendingProducts,
   };
   try { fs.writeFileSync('./log.json', JSON.stringify(data, null, 2)); } catch {}
 }
@@ -289,6 +291,52 @@ app.post('/api/seo/apply', async (req, res) => {
   res.json({ applied, errors });
 });
 
+// ── Pending Products (webhook) ────────────────────────────────────────────────
+app.post('/api/webhook/products/create', express.raw({ type: 'application/json' }), (req, res) => {
+  const secret = process.env.SHOPIFY_WEBHOOK_SECRET;
+  if (secret) {
+    const hmac = req.headers['x-shopify-hmac-sha256'];
+    const digest = crypto.createHmac('sha256', secret).update(req.body).digest('base64');
+    if (hmac !== digest) return res.status(401).send('Unauthorized');
+  }
+  try {
+    const p = JSON.parse(req.body);
+    if (!pendingProducts.find(x => x.id === String(p.id))) {
+      pendingProducts.push({
+        id: String(p.id),
+        gid: `gid://shopify/Product/${p.id}`,
+        title: p.title || '',
+        handle: p.handle || '',
+        status: (p.status || 'draft').toLowerCase(),
+        tags: Array.isArray(p.tags) ? p.tags : (p.tags || '').split(',').map(t => t.trim()).filter(Boolean),
+        vendor: p.vendor || '',
+        productType: p.product_type || '',
+        description: (p.body_html || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().substring(0, 600),
+        sku: p.variants?.[0]?.sku || '',
+        currentMetaTitle: p.seo_title || '',
+        currentMetaDescription: p.seo_description || '',
+        addedAt: new Date().toISOString(),
+      });
+      saveStore();
+    }
+  } catch (e) { console.error('Webhook parse error:', e.message); }
+  res.status(200).send('ok');
+});
+
+app.get('/api/pending', (req, res) => res.json(pendingProducts));
+
+app.delete('/api/pending/:id', (req, res) => {
+  pendingProducts = pendingProducts.filter(p => p.id !== req.params.id);
+  saveStore();
+  res.json({ ok: true });
+});
+
+app.delete('/api/pending', (req, res) => {
+  pendingProducts = [];
+  saveStore();
+  res.json({ ok: true });
+});
+
 const FURNITURE_STYLES = [
   'Luis XV','Luis XVI','Transicion','Transición','Regencia','Sheraton',
   'Georgian','Victoriano','Directorio','Edwardian','Louis Philippe',
@@ -418,6 +466,7 @@ function adminUI(host) {
 <body>
 <div class="sidebar">
   <div class="sidebar-logo">Bucarest SEO</div>
+  <button class="nav-btn" id="nav-pending" onclick="showPage('pending',this)" style="position:relative"><span class="nav-dot"></span>Pendientes<span id="pending-badge" style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);background:#c0392b;color:#fff;font-size:9px;font-weight:bold;border-radius:8px;padding:1px 5px;min-width:14px;text-align:center"></span></button>
   <button class="nav-btn active" onclick="showPage('products',this)"><span class="nav-dot"></span>Productos</button>
   <button class="nav-btn" onclick="showPage('collections',this)"><span class="nav-dot"></span>Colecciones</button>
   <button class="nav-btn" onclick="showPage('metaobjects',this)"><span class="nav-dot"></span>Metaobjetos</button>
@@ -671,6 +720,37 @@ function adminUI(host) {
   <div id="img-msg"></div>
 </div>
 
+<!-- PENDIENTES -->
+<div class="page" id="page-pending">
+  <h1>Pendientes</h1>
+  <p class="subtitle">Productos recién agregados a Shopify que aún no tienen SEO generado.</p>
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+      <span id="pend-count" style="font-size:12px;color:#888"></span>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" id="pend-gen-btn" onclick="generatePendingSEO()" disabled>Generar SEO</button>
+        <button class="btn" onclick="clearPending()" style="font-size:12px;color:#999;background:none;border:1px solid #ddd6cc">Limpiar lista</button>
+      </div>
+    </div>
+    <div id="pend-list"><p class="empty-msg">Cargando…</p></div>
+    <div id="pend-prog" style="display:none;margin-top:14px">
+      <div style="height:4px;background:#eee;border-radius:2px"><div id="pend-pfill" style="height:4px;background:#9a7f5a;border-radius:2px;width:0;transition:width 0.3s"></div></div>
+      <div id="pend-plbl" style="font-size:11px;color:#888;margin-top:6px"></div>
+    </div>
+  </div>
+  <div class="results-section" id="pend-results">
+    <h2>Propuestas generadas</h2>
+    <p class="subtitle" id="pend-rsub"></p>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+      <span id="pend-acount" style="font-size:13px;color:#666"></span>
+      <button class="btn btn-primary" id="pend-apply-btn" onclick="applyPendingSEO()" disabled>Aplicar en Shopify</button>
+      <span id="pend-apply-msg" class="msg" style="display:none"></span>
+    </div>
+    <div class="results-wrap"><table class="rtbl"><thead><tr><th>Producto</th><th>Meta título actual</th><th style="min-width:200px">Meta título propuesto <span style="opacity:0.4;font-size:8px">≤60</span></th><th style="min-width:260px">Meta descripción propuesta <span style="opacity:0.4;font-size:8px">≤160</span></th><th>Acción</th></tr></thead><tbody id="pend-rtbody"></tbody></table></div>
+  </div>
+  <div id="pend-msg"></div>
+</div>
+
 <!-- CONFIGURACIÓN -->
 <div class="page" id="page-config">
   <h1>Configuración</h1>
@@ -749,6 +829,7 @@ async function init() {
     fetch('/api/collections').then(r=>r.json()),
     fetch('/api/processed-ids').then(r=>r.json()),
   ]);
+  loadPendingBadge();
   Object.keys(pids).forEach(k => { if (k !== 'changedUrls') processedIds[k] = new Set(pids[k]); });
   if (pids.changedUrls) { changedUrlIds.products = new Set(pids.changedUrls.products||[]); changedUrlIds.collections = new Set(pids.changedUrls.collections||[]); }
   ['p-col','img-col'].forEach(id => {
@@ -766,6 +847,7 @@ function showPage(name, btn) {
   if (name==='history') loadHistory();
   if (name==='metaobjects') loadMetaobjectTypes();
   if (name==='config') loadConfig();
+  if (name==='pending') loadPending();
 }
 
 // ── Shared utils ──────────────────────────────────────────────────────────────
@@ -1487,6 +1569,183 @@ async function confirmURL(btn) {
     alert('Error: '+e.message);
     btn.disabled=false; btn.textContent=orig;
   }
+}
+
+// ── Pending ───────────────────────────────────────────────────────────────────
+let pendingItems = [];
+let pendingResults = [];
+
+async function loadPendingBadge() {
+  try {
+    const data = await fetch('/api/pending').then(r=>r.json());
+    const badge = document.getElementById('pending-badge');
+    if (badge) { badge.textContent = data.length; badge.style.display = data.length ? 'inline-block' : 'none'; }
+  } catch(e) {}
+}
+
+async function loadPending() {
+  try {
+    pendingItems = await fetch('/api/pending').then(r=>r.json());
+    renderPendingTable();
+    const badge = document.getElementById('pending-badge');
+    if (badge) { badge.textContent = pendingItems.length; badge.style.display = pendingItems.length ? 'inline-block' : 'none'; }
+  } catch(e) {
+    document.getElementById('pend-list').innerHTML='<p class="empty-msg">Error cargando pendientes.</p>';
+  }
+}
+
+function renderPendingTable() {
+  const list = document.getElementById('pend-list');
+  const countEl = document.getElementById('pend-count');
+  const genBtn = document.getElementById('pend-gen-btn');
+  if (!pendingItems.length) {
+    list.innerHTML='<p class="empty-msg">No hay productos pendientes. Cuando agregues un producto en Shopify aparecerá aquí automáticamente.</p>';
+    if (countEl) countEl.textContent='';
+    if (genBtn) genBtn.disabled=true;
+    return;
+  }
+  if (countEl) countEl.textContent = pendingItems.length+' producto(s) pendiente(s)';
+  if (genBtn) genBtn.disabled=false;
+  list.innerHTML=\`<table class="tbl"><thead><tr><th style="width:30px"></th><th>Título</th><th>SKU</th><th>Estado</th><th>Agregado</th><th style="width:32px"></th></tr></thead><tbody>
+    \${pendingItems.map((p,i)=>\`<tr onclick="togglePendingRow(\${i})">
+      <td><input type="checkbox" name="pend_item" value="\${p.id}" data-idx="\${i}" checked onchange="updatePendingCount();event.stopPropagation()"></td>
+      <td>\${esc(p.title)}</td>
+      <td style="color:#aaa">\${esc(p.sku||'—')}</td>
+      <td><span class="status-badge \${p.status==='active'?'s-active':'s-draft'}">\${p.status==='active'?'Activo':'Borrador'}</span></td>
+      <td style="color:#aaa;font-size:11px">\${new Date(p.addedAt).toLocaleDateString('es-CL')}</td>
+      <td><button onclick="dismissPending('\${p.id}');event.stopPropagation()" style="background:none;border:none;color:#bbb;cursor:pointer;font-size:14px;padding:2px 4px" title="Descartar">✕</button></td>
+    </tr>\`).join('')}
+  </tbody></table>\`;
+  updatePendingCount();
+}
+
+function togglePendingRow(idx) {
+  const cb = document.querySelector('[name="pend_item"][data-idx="'+idx+'"]');
+  if (cb) { cb.checked=!cb.checked; updatePendingCount(); }
+}
+
+function updatePendingCount() {
+  const n = document.querySelectorAll('[name="pend_item"]:checked').length;
+  const genBtn = document.getElementById('pend-gen-btn');
+  if (genBtn) genBtn.disabled = !n;
+}
+
+async function dismissPending(id) {
+  await fetch('/api/pending/'+id, {method:'DELETE'});
+  pendingItems = pendingItems.filter(p=>p.id!==id);
+  renderPendingTable();
+  const badge = document.getElementById('pending-badge');
+  if (badge) { badge.textContent=pendingItems.length; badge.style.display=pendingItems.length?'inline-block':'none'; }
+}
+
+async function clearPending() {
+  if (!confirm('¿Limpiar toda la lista de pendientes?')) return;
+  await fetch('/api/pending', {method:'DELETE'});
+  pendingItems=[];
+  renderPendingTable();
+  const badge=document.getElementById('pending-badge');
+  if (badge) badge.style.display='none';
+}
+
+async function generatePendingSEO() {
+  const checked = Array.from(document.querySelectorAll('[name="pend_item"]:checked'));
+  const items = checked.map(cb => pendingItems[parseInt(cb.dataset.idx)]).filter(Boolean);
+  if (!items.length) return;
+
+  pendingResults = [];
+  document.getElementById('pend-rtbody').innerHTML='';
+  document.getElementById('pend-results').style.display='none';
+  document.getElementById('pend-prog').style.display='block';
+  document.getElementById('pend-gen-btn').disabled=true;
+
+  const BATCH=20; const total=items.length; let done=0;
+  for (let b=0; b<items.length; b+=BATCH) {
+    const chunk=items.slice(b,b+BATCH);
+    const ok=await runPendingChunk(chunk, done, total);
+    if (!ok) return;
+    done+=chunk.length;
+  }
+
+  document.getElementById('pend-prog').style.display='none';
+  document.getElementById('pend-gen-btn').disabled=false;
+  const n=pendingResults.length;
+  const sec=document.getElementById('pend-results'); sec.style.display='block';
+  document.getElementById('pend-rsub').textContent=n+' propuesta(s) generada(s). Revisa y edita antes de aplicar.';
+  updatePendingApplyCount();
+  sec.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function runPendingChunk(items, offset, total) {
+  return new Promise(async resolve => {
+    try {
+      const {jobId} = await fetch('/api/seo/queue',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'products',items})}).then(r=>r.json());
+      const es = new EventSource('/api/seo/stream/'+jobId);
+      es.onmessage = e => {
+        const data=JSON.parse(e.data);
+        if (data.done) { es.close(); resolve(true); return; }
+        document.getElementById('pend-pfill').style.width=Math.round((offset+data.index)/total*100)+'%';
+        document.getElementById('pend-plbl').textContent='Procesando '+(offset+data.index)+' de '+total+'…';
+        if (!data.error) { pendingResults.push({...data, approved:true}); appendPendingResult(data, pendingResults.length-1); }
+        else { const tr=document.createElement('tr'); tr.innerHTML=\`<td colspan="5" style="color:#c0392b;font-size:11px;padding:8px 12px">Error en "\${esc(data.itemTitle||'?')}": \${esc(data.error)}</td>\`; document.getElementById('pend-rtbody').appendChild(tr); }
+        updatePendingApplyCount();
+      };
+      es.onerror = () => { es.close(); document.getElementById('pend-prog').style.display='none'; document.getElementById('pend-gen-btn').disabled=false; if(pendingResults.length){document.getElementById('pend-results').style.display='block';updatePendingApplyCount();} resolve(false); };
+    } catch(e) { document.getElementById('pend-prog').style.display='none'; document.getElementById('pend-gen-btn').disabled=false; resolve(false); }
+  });
+}
+
+function appendPendingResult(data, idx) {
+  const tbody=document.getElementById('pend-rtbody');
+  const tr=document.createElement('tr'); tr.id='pend-rr-'+idx;
+  tr.innerHTML=\`
+    <td class="td-name">\${esc(data.productTitle)}</td>
+    <td class="td-cur">\${esc(data.currentMetaTitle||'(sin meta título)')}</td>
+    <td><input class="seo-inp" type="text" maxlength="65" value="\${esc(data.metaTitle)}" oninput="charCount(this,60,'pend-ct-\${idx}')" id="pend-ti-\${idx}"><div class="char-c" id="pend-ct-\${idx}"></div></td>
+    <td><textarea class="seo-inp" maxlength="165" rows="3" oninput="charCount(this,160,'pend-cd-\${idx}')" id="pend-di-\${idx}">\${esc(data.metaDescription)}</textarea><div class="char-c" id="pend-cd-\${idx}"></div></td>
+    <td class="td-act"><div style="display:flex;gap:5px;flex-direction:column"><button class="btn-ap on" id="pend-ba-\${idx}" onclick="setPendingApp(\${idx},true)">Aprobar</button><button class="btn-rj" id="pend-br-\${idx}" onclick="setPendingApp(\${idx},false)">Rechazar</button></div></td>
+  \`;
+  tbody.appendChild(tr);
+  const ti=document.getElementById('pend-ti-'+idx); if(ti) charCount(ti,60,'pend-ct-'+idx);
+  const di=document.getElementById('pend-di-'+idx); if(di) charCount(di,160,'pend-cd-'+idx);
+}
+
+function setPendingApp(idx, approved) {
+  pendingResults[idx].approved=approved;
+  document.getElementById('pend-ba-'+idx).classList.toggle('on',approved);
+  document.getElementById('pend-br-'+idx).classList.toggle('on',!approved);
+  document.getElementById('pend-rr-'+idx).classList.toggle('rejected',!approved);
+  updatePendingApplyCount();
+}
+
+function updatePendingApplyCount() {
+  const n=pendingResults.filter(r=>r.approved).length;
+  const el=document.getElementById('pend-acount'); if(el) el.textContent=n+' aprobada(s)';
+  const btn=document.getElementById('pend-apply-btn'); if(btn) btn.disabled=!n;
+}
+
+async function applyPendingSEO() {
+  const toApply=pendingResults
+    .map((r,idx)=>r.approved?{...r, metaTitle:(document.getElementById('pend-ti-'+idx)?.value||r.metaTitle).trim(), metaDescription:(document.getElementById('pend-di-'+idx)?.value||r.metaDescription).trim()}:null)
+    .filter(Boolean);
+  if (!toApply.length) return;
+  const btn=document.getElementById('pend-apply-btn'); btn.disabled=true; btn.textContent='Aplicando…';
+  try {
+    const res=await fetch('/api/seo/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'products',items:toApply})}).then(r=>r.json());
+    const msgEl=document.getElementById('pend-apply-msg');
+    msgEl.className='msg '+(res.errors.length?'err':'ok');
+    msgEl.textContent=res.applied.length+' actualizado(s) en Shopify.'+(res.errors.length?' '+res.errors.length+' error(es).':'');
+    msgEl.style.display='block';
+    for (const a of res.applied) {
+      await fetch('/api/pending/'+a.id, {method:'DELETE'});
+      pendingItems=pendingItems.filter(p=>p.id!==a.id);
+    }
+    renderPendingTable();
+    const badge=document.getElementById('pending-badge');
+    if (badge) { badge.textContent=pendingItems.length; badge.style.display=pendingItems.length?'inline-block':'none'; }
+    pendingResults=pendingResults.filter(r=>!res.applied.find(a=>a.id===r.productId));
+    updatePendingApplyCount();
+  } catch(e) { document.getElementById('pend-apply-msg').className='msg err'; document.getElementById('pend-apply-msg').textContent='Error: '+e.message; document.getElementById('pend-apply-msg').style.display='block'; }
+  btn.textContent='Aplicar en Shopify'; btn.disabled=false;
 }
 
 init();
