@@ -293,4 +293,42 @@ Responde SOLO con JSON: {"metaTitle":"...","metaDescription":"..."}`);
   };
 }
 
-module.exports = { generateSEO, generateCollectionSEO, generateMetaobjectSEO, generateArticleSEO, generateAltText, generatePaintingSEO, generateFurnitureSEO };
+async function researchSEO(query, type) {
+  const withCompetitors = ['products', 'articles'].includes(type);
+  const competitorsField = withCompetitors
+    ? `"competitors": [{"url": "dominio.cl", "metaTitle": "...", "metaDescription": "..."}],`
+    : '';
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 2500,
+    tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }],
+    messages: [{
+      role: 'user',
+      content: `Eres experto en SEO para tiendas de antigüedades y arte en Chile.
+
+Investiga en Google cómo se busca "${query}" para una tienda de antigüedades de lujo en Santiago de Chile.
+
+Busca y analiza:
+1. Los términos más buscados en Google Chile para este tipo de pieza/tema — en español cotidiano, como buscaría un comprador
+${withCompetitors ? '2. Los metatítulos y metadescripciones reales de los primeros 3-5 resultados de Google' : ''}
+3. Términos con contexto local: Santiago, Providencia, Chile
+4. Términos de intención de compra: precio, comprar, a la venta, tienda
+
+Responde SOLO con este JSON exacto, sin texto adicional:
+{
+  "keywords": [{"term": "...", "relevance": "alta|media|baja"}],
+  ${competitorsField}
+  "suggested": ["término 1", "término 2", "término 3"],
+  "local": [{"term": "...", "category": "ubicación|compra"}]
+}`,
+    }],
+  });
+
+  const text = response.content.filter(b => b.type === 'text').map(b => b.text).join('');
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error('No se pudo parsear la investigación');
+  return JSON.parse(match[0]);
+}
+
+module.exports = { generateSEO, generateCollectionSEO, generateMetaobjectSEO, generateArticleSEO, generateAltText, generatePaintingSEO, generateFurnitureSEO, researchSEO };

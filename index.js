@@ -373,6 +373,16 @@ const FURNITURE_RULES = `REGLAS ESPECIALES PARA MUEBLES ANTIGUOS:
 • NUNCA incluir medidas, dimensiones ni centímetros en el metatítulo, aunque aparezcan en el título o la descripción del producto.
 • Metadescripción: desarrollar origen, estilo, material y antigüedad con lenguaje elegante. Las medidas pueden mencionarse aquí si aportan valor.`;
 
+// ── Research SEO ─────────────────────────────────────────────────────────────
+app.post('/api/research', requireAuth, async (req, res) => {
+  const { query, type } = req.body;
+  if (!query) return res.status(400).json({ error: 'Falta query' });
+  try {
+    const result = await seo.researchSEO(query, type || 'products');
+    res.json(result);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── Test web search (temporal) ────────────────────────────────────────────────
 app.get('/api/test-websearch', requireAuth, async (req, res) => {
   const Anthropic = require('@anthropic-ai/sdk');
@@ -492,6 +502,42 @@ function adminUI(host) {
     .url-upd-btn:hover{border-color:#9a7f5a;background:#faf8f5}
     .url-upd-done{border-color:#b8d8bc!important;background:#e6f4ea!important;color:#2d6a2d!important}
     .url-cell{min-width:150px}
+    .btn-research{background:none;border:1px solid #9a7f5a;color:#9a7f5a;padding:11px 18px;font-size:10px;letter-spacing:0.14em;text-transform:uppercase;cursor:pointer;font-family:inherit;transition:all 0.2s}
+    .btn-research:hover{background:#9a7f5a;color:#fff}
+    .btn-research.active-research{background:#9a7f5a;color:#fff}
+    .rmodal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;align-items:flex-start;justify-content:flex-end;padding:0}
+    .rmodal-overlay.open{display:flex}
+    .rmodal{background:#fff;width:480px;max-width:100vw;height:100vh;overflow-y:auto;display:flex;flex-direction:column;box-shadow:-4px 0 24px rgba(0,0,0,0.15)}
+    .rmodal-header{padding:20px 22px 16px;border-bottom:1px solid #e8e2d9;display:flex;align-items:center;gap:12px;position:sticky;top:0;background:#fff;z-index:10}
+    .rmodal-title{font-size:14px;font-weight:600;color:#1a1a1a;flex:1}
+    .rmodal-close{background:none;border:none;font-size:20px;cursor:pointer;color:#aaa;padding:0;line-height:1}
+    .rmodal-close:hover{color:#1a1a1a}
+    .rmodal-body{padding:18px 22px;flex:1}
+    .rmodal-query{display:flex;gap:8px;margin-bottom:18px}
+    .rmodal-query input{flex:1;padding:9px 12px;border:1px solid #ddd6cc;font-size:13px;font-family:inherit;outline:none;color:#1a1a1a}
+    .rmodal-query input:focus{border-color:#9a7f5a}
+    .rsection{margin-bottom:22px}
+    .rsection-title{font-size:9px;letter-spacing:0.15em;text-transform:uppercase;color:#9a7f5a;margin-bottom:10px;display:block}
+    .rkw-grid{display:flex;flex-wrap:wrap;gap:6px}
+    .rkw-tag{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border:1px solid #e8e2d9;background:#fdfcfb;font-size:12px;cursor:pointer;transition:all 0.15s;user-select:none}
+    .rkw-tag:hover{border-color:#9a7f5a}
+    .rkw-tag.selected{background:#1a1a1a;border-color:#1a1a1a;color:#fff}
+    .rkw-tag input{display:none}
+    .rkw-rel{font-size:9px;padding:1px 5px;border-radius:8px;letter-spacing:0.04em}
+    .rel-alta{background:#e6f4ea;color:#2d6a2d}.rkw-tag.selected .rel-alta{background:rgba(255,255,255,0.2);color:#fff}
+    .rel-media{background:#fff8e6;color:#7a5c1a}.rkw-tag.selected .rel-media{background:rgba(255,255,255,0.2);color:#fff}
+    .rel-baja{background:#f0f0f0;color:#888}.rkw-tag.selected .rel-baja{background:rgba(255,255,255,0.15);color:#ddd}
+    .rcomp-card{border:1px solid #e8e2d9;padding:12px 14px;margin-bottom:8px;background:#fdfcfb}
+    .rcomp-url{font-size:10px;color:#9a7f5a;margin-bottom:4px;word-break:break-all}
+    .rcomp-meta-title{font-size:12px;font-weight:600;color:#1a1a1a;margin-bottom:3px}
+    .rcomp-meta-desc{font-size:11px;color:#777;line-height:1.5}
+    .rmodal-footer{padding:16px 22px;border-top:1px solid #e8e2d9;display:flex;gap:10px;position:sticky;bottom:0;background:#fff}
+    .rmodal-loading{padding:30px;text-align:center;color:#aaa;font-size:13px}
+    .rmodal-err{padding:16px;background:#fff5f5;border:1px solid #f5c0c0;color:#c0392b;font-size:12px;border-radius:2px}
+    .rmanual-row{display:flex;gap:8px;margin-top:8px}
+    .rmanual-row input{flex:1;padding:7px 10px;border:1px solid #ddd6cc;font-size:12px;font-family:inherit;outline:none}
+    .rmanual-row input:focus{border-color:#9a7f5a}
+    @media(max-width:600px){.rmodal{width:100vw}}
   </style>
 </head>
 <body>
@@ -593,6 +639,7 @@ function adminUI(host) {
   </div>
   <div class="btn-row">
     <button class="btn btn-primary" id="p-gen-btn" onclick="startGen('products')" disabled>Generar SEO con Claude</button>
+    <button class="btn-research" id="p-research-btn" onclick="openResearch('products')">Investigar</button>
     <button class="btn btn-secondary" id="p-url-btn" onclick="bulkUpdateURLs('products')" disabled>Actualizar URLs seleccionadas</button>
     <span class="btn-hint" id="p-hint">Seleccione productos</span>
   </div>
@@ -626,6 +673,7 @@ function adminUI(host) {
   </div>
   <div class="btn-row">
     <button class="btn btn-primary" id="c-gen-btn" onclick="startGen('collections')" disabled>Generar SEO con Claude</button>
+    <button class="btn-research" onclick="openResearch('collections')">Investigar</button>
     <span class="btn-hint" id="c-hint">Cargue las colecciones primero</span>
   </div>
   <div class="progress-wrap" id="c-prog"><div class="progress-bar"><div class="progress-fill" id="c-pfill"></div></div><div class="progress-lbl" id="c-plbl"></div></div>
@@ -657,6 +705,7 @@ function adminUI(host) {
   </div>
   <div class="btn-row">
     <button class="btn btn-primary" id="mo-gen-btn" onclick="startGen('metaobjects')" disabled>Generar SEO con Claude</button>
+    <button class="btn-research" onclick="openResearch('metaobjects')">Investigar</button>
     <span class="btn-hint" id="mo-hint">Seleccione un tipo</span>
   </div>
   <div class="progress-wrap" id="mo-prog"><div class="progress-bar"><div class="progress-fill" id="mo-pfill"></div></div><div class="progress-lbl" id="mo-plbl"></div></div>
@@ -691,6 +740,7 @@ function adminUI(host) {
   </div>
   <div class="btn-row">
     <button class="btn btn-primary" id="art-gen-btn" onclick="startGen('articles')" disabled>Generar SEO con Claude</button>
+    <button class="btn-research" onclick="openResearch('articles')">Investigar</button>
     <span class="btn-hint" id="art-hint">Seleccione artículos</span>
   </div>
   <div class="progress-wrap" id="art-prog"><div class="progress-bar"><div class="progress-fill" id="art-pfill"></div></div><div class="progress-lbl" id="art-plbl"></div></div>
@@ -831,6 +881,27 @@ function adminUI(host) {
 </div>
 
 </div><!-- /main -->
+
+<!-- MODAL INVESTIGACIÓN SEO -->
+<div class="rmodal-overlay" id="rmodal-overlay" onclick="closeResearch(event)">
+  <div class="rmodal" onclick="event.stopPropagation()">
+    <div class="rmodal-header">
+      <span class="rmodal-title">Investigación SEO</span>
+      <button class="rmodal-close" onclick="closeResearch()">✕</button>
+    </div>
+    <div class="rmodal-body">
+      <div class="rmodal-query">
+        <input id="rmodal-query-input" placeholder="Ej: cómoda antigua francesa Luis XVI…" onkeydown="if(event.key==='Enter')runResearch()">
+        <button class="btn btn-primary" onclick="runResearch()" id="rmodal-search-btn" style="white-space:nowrap;padding:9px 16px">Investigar</button>
+      </div>
+      <div id="rmodal-content"><p class="rmodal-loading">Escribe un término y haz clic en Investigar.</p></div>
+    </div>
+    <div class="rmodal-footer">
+      <button class="btn btn-primary" onclick="applyResearch()" id="rmodal-apply-btn" disabled>Usar términos seleccionados</button>
+      <button class="btn btn-secondary" onclick="closeResearch()">Cerrar</button>
+    </div>
+  </div>
+</div>
 
 <script>
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -1600,6 +1671,152 @@ async function confirmURL(btn) {
     alert('Error: '+e.message);
     btn.disabled=false; btn.textContent=orig;
   }
+}
+
+// ── Research ──────────────────────────────────────────────────────────────────
+let researchType = 'products';
+let researchData = null;
+
+function getResearchQuery(type) {
+  if (type === 'products') {
+    if (pFilterType === 'collection') { const sel = document.getElementById('p-col'); return sel.options[sel.selectedIndex]?.textContent || ''; }
+    if (pFilterType === 'tag') return document.getElementById('p-tag').value.trim();
+    if (pFilterType === 'title') return document.getElementById('p-title').value.trim();
+  }
+  if (type === 'collections') {
+    const checked = document.querySelector('[name="c_item"]:checked');
+    if (checked) { try { return JSON.parse(checked.dataset.obj).title; } catch(e){} }
+    return '';
+  }
+  if (type === 'metaobjects') {
+    const checked = document.querySelector('[name="mo_item"]:checked');
+    if (checked) { try { return JSON.parse(checked.dataset.obj).displayName; } catch(e){} }
+    return document.getElementById('mo-type').value || '';
+  }
+  if (type === 'articles') {
+    const checked = document.querySelector('[name="art_item"]:checked');
+    if (checked) { try { return JSON.parse(checked.dataset.obj).title; } catch(e){} }
+    return document.getElementById('art-search').value.trim();
+  }
+  return '';
+}
+
+function openResearch(type) {
+  researchType = type;
+  researchData = null;
+  const overlay = document.getElementById('rmodal-overlay');
+  overlay.classList.add('open');
+  document.getElementById('rmodal-query-input').value = getResearchQuery(type);
+  document.getElementById('rmodal-content').innerHTML = '<p class="rmodal-loading">Escribe un término y haz clic en Investigar.</p>';
+  document.getElementById('rmodal-apply-btn').disabled = true;
+  document.querySelectorAll('.btn-research').forEach(b => b.classList.remove('active-research'));
+  const btn = document.getElementById((type === 'products' ? 'p' : type === 'articles' ? 'art' : type === 'collections' ? 'c' : 'mo') + '-research-btn') || document.querySelector(\`.btn-research[onclick*="\${type}"]\`);
+  if (btn) btn.classList.add('active-research');
+}
+
+function closeResearch(e) {
+  if (e && e.target !== document.getElementById('rmodal-overlay')) return;
+  document.getElementById('rmodal-overlay').classList.remove('open');
+  document.querySelectorAll('.btn-research').forEach(b => b.classList.remove('active-research'));
+}
+
+async function runResearch() {
+  const query = document.getElementById('rmodal-query-input').value.trim();
+  if (!query) return;
+  const btn = document.getElementById('rmodal-search-btn');
+  btn.disabled = true; btn.textContent = 'Investigando…';
+  document.getElementById('rmodal-content').innerHTML = '<p class="rmodal-loading">Buscando en Google… esto puede tomar unos segundos.</p>';
+  document.getElementById('rmodal-apply-btn').disabled = true;
+  researchData = null;
+  try {
+    const res = await fetch('/api/research', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ query, type: researchType }) }).then(r => r.json());
+    if (res.error) throw new Error(res.error);
+    researchData = res;
+    renderResearch(res);
+  } catch(e) {
+    document.getElementById('rmodal-content').innerHTML = \`<div class="rmodal-err">Error: \${esc(e.message)}</div>\`;
+  }
+  btn.disabled = false; btn.textContent = 'Investigar';
+}
+
+function renderResearch(data) {
+  const withCompetitors = ['products', 'articles'].includes(researchType);
+  let html = '';
+
+  if (data.keywords?.length) {
+    html += \`<div class="rsection"><span class="rsection-title">Palabras clave encontradas</span><div class="rkw-grid">\`;
+    data.keywords.forEach((kw, i) => {
+      html += \`<label class="rkw-tag" id="rkw-\${i}"><input type="checkbox" name="rterm" value="\${esc(kw.term)}" checked onchange="updateResearchApply()"><span>\${esc(kw.term)}</span><span class="rkw-rel rel-\${kw.relevance||'media'}">\${kw.relevance||'media'}</span></label>\`;
+    });
+    html += '</div></div>';
+  }
+
+  if (withCompetitors && data.competitors?.length) {
+    html += '<div class="rsection"><span class="rsection-title">Competencia en Google</span>';
+    data.competitors.forEach(c => {
+      html += \`<div class="rcomp-card"><div class="rcomp-url">\${esc(c.url||'')}</div><div class="rcomp-meta-title">\${esc(c.metaTitle||'(sin metatítulo)')}</div><div class="rcomp-meta-desc">\${esc(c.metaDescription||'(sin metadescripción)')}</div></div>\`;
+    });
+    html += '</div>';
+  }
+
+  if (data.suggested?.length) {
+    html += '<div class="rsection"><span class="rsection-title">Términos sugeridos</span><div class="rkw-grid">';
+    data.suggested.forEach((t, i) => {
+      const idx = (data.keywords?.length||0) + i;
+      html += \`<label class="rkw-tag" id="rkw-\${idx}"><input type="checkbox" name="rterm" value="\${esc(t)}" checked onchange="updateResearchApply()"><span>\${esc(t)}</span></label>\`;
+    });
+    html += '</div>';
+    html += '<div class="rmanual-row"><input id="rmanual-input" placeholder="Agregar término manual…" onkeydown="if(event.key===\'Enter\')addManualTerm()"><button class="btn btn-secondary" onclick="addManualTerm()" style="white-space:nowrap;padding:7px 12px;font-size:11px">+ Agregar</button></div>';
+    html += '</div>';
+  }
+
+  if (data.local?.length) {
+    html += '<div class="rsection"><span class="rsection-title">Contexto local e intención de compra</span><div class="rkw-grid">';
+    data.local.forEach((t, i) => {
+      const idx = (data.keywords?.length||0) + (data.suggested?.length||0) + i;
+      html += \`<label class="rkw-tag" id="rkw-\${idx}"><input type="checkbox" name="rterm" value="\${esc(t.term)}" onchange="updateResearchApply()"><span>\${esc(t.term)}</span><span class="rkw-rel rel-media">\${esc(t.category||'')}</span></label>\`;
+    });
+    html += '</div></div>';
+  }
+
+  if (!html) html = '<p class="rmodal-loading">No se encontraron datos. Intenta con otro término.</p>';
+  document.getElementById('rmodal-content').innerHTML = html;
+  updateResearchApply();
+}
+
+function updateResearchApply() {
+  const n = document.querySelectorAll('[name="rterm"]:checked').length;
+  document.getElementById('rmodal-apply-btn').disabled = !n;
+}
+
+function addManualTerm() {
+  const inp = document.getElementById('rmanual-input');
+  const val = inp.value.trim();
+  if (!val) return;
+  const grid = inp.closest('.rsection').querySelector('.rkw-grid');
+  const label = document.createElement('label');
+  label.className = 'rkw-tag selected';
+  label.innerHTML = \`<input type="checkbox" name="rterm" value="\${esc(val)}" checked onchange="updateResearchApply()"><span>\${esc(val)}</span>\`;
+  grid.appendChild(label);
+  inp.value = '';
+  updateResearchApply();
+}
+
+function applyResearch() {
+  const terms = Array.from(document.querySelectorAll('[name="rterm"]:checked')).map(c => c.value);
+  if (!terms.length) return;
+  const prefixMap = { products:'p', collections:'c', metaobjects:'mo', articles:'art' };
+  const prefix = prefixMap[researchType] || 'p';
+  const ta = document.getElementById(prefix+'-one-time-rules');
+  if (ta) {
+    const existing = ta.value.trim();
+    const injection = 'Términos clave a priorizar en el SEO: ' + terms.join(', ') + '.';
+    ta.value = existing ? existing + '\n' + injection : injection;
+  }
+  document.getElementById('rmodal-overlay').classList.remove('open');
+  document.querySelectorAll('.btn-research').forEach(b => b.classList.remove('active-research'));
+  const resBtn = document.getElementById(prefix+'-research-btn') || document.querySelector(\`.btn-research[onclick*="\${researchType}"]\`);
+  if (resBtn) { resBtn.classList.add('active-research'); resBtn.title = terms.length+' término(s) aplicado(s)'; }
 }
 
 // ── Pending ───────────────────────────────────────────────────────────────────
