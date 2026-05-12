@@ -1743,10 +1743,12 @@ function renderResearch(data) {
   const withCompetitors = ['products', 'articles'].includes(researchType);
   let html = '';
 
+  const kwChange = 'this.closest(\\'.rkw-tag\\').classList.toggle(\\'selected\\',this.checked);updateResearchApply()';
+
   if (data.keywords?.length) {
     html += \`<div class="rsection"><span class="rsection-title">Palabras clave encontradas</span><div class="rkw-grid">\`;
     data.keywords.forEach((kw, i) => {
-      html += \`<label class="rkw-tag" id="rkw-\${i}"><input type="checkbox" name="rterm" value="\${esc(kw.term)}" checked onchange="updateResearchApply()"><span>\${esc(kw.term)}</span><span class="rkw-rel rel-\${kw.relevance||'media'}">\${kw.relevance||'media'}</span></label>\`;
+      html += \`<label class="rkw-tag selected" id="rkw-\${i}"><input type="checkbox" name="rterm" value="\${esc(kw.term)}" checked onchange="\${kwChange}"><span>\${esc(kw.term)}</span><span class="rkw-rel rel-\${kw.relevance||'media'}">\${kw.relevance||'media'}</span></label>\`;
     });
     html += '</div></div>';
   }
@@ -1762,8 +1764,7 @@ function renderResearch(data) {
   if (data.suggested?.length) {
     html += '<div class="rsection"><span class="rsection-title">Términos sugeridos</span><div class="rkw-grid">';
     data.suggested.forEach((t, i) => {
-      const idx = (data.keywords?.length||0) + i;
-      html += \`<label class="rkw-tag" id="rkw-\${idx}"><input type="checkbox" name="rterm" value="\${esc(t)}" checked onchange="updateResearchApply()"><span>\${esc(t)}</span></label>\`;
+      html += \`<label class="rkw-tag selected"><input type="checkbox" name="rterm" value="\${esc(t)}" checked onchange="\${kwChange}"><span>\${esc(t)}</span></label>\`;
     });
     html += '</div>';
     html += '<div class="rmanual-row"><input id="rmanual-input" placeholder="Agregar término manual…" onkeydown="if(event.keyCode===13)addManualTerm()"><button class="btn btn-secondary" onclick="addManualTerm()" style="white-space:nowrap;padding:7px 12px;font-size:11px">+ Agregar</button></div>';
@@ -1773,8 +1774,7 @@ function renderResearch(data) {
   if (data.local?.length) {
     html += '<div class="rsection"><span class="rsection-title">Contexto local e intención de compra</span><div class="rkw-grid">';
     data.local.forEach((t, i) => {
-      const idx = (data.keywords?.length||0) + (data.suggested?.length||0) + i;
-      html += \`<label class="rkw-tag" id="rkw-\${idx}"><input type="checkbox" name="rterm" value="\${esc(t.term)}" onchange="updateResearchApply()"><span>\${esc(t.term)}</span><span class="rkw-rel rel-media">\${esc(t.category||'')}</span></label>\`;
+      html += \`<label class="rkw-tag"><input type="checkbox" name="rterm" value="\${esc(t.term)}" onchange="\${kwChange}"><span>\${esc(t.term)}</span><span class="rkw-rel rel-media">\${esc(t.category||'')}</span></label>\`;
     });
     html += '</div></div>';
   }
