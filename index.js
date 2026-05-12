@@ -648,7 +648,7 @@ function adminUI(host) {
   <div class="results-section" id="p-results">
     <h2>Propuestas</h2><p class="results-subtitle" id="p-rsub"></p>
     <div class="results-wrap"><table class="rtbl"><thead><tr><th>Producto</th><th>Meta título actual</th><th style="min-width:200px">Meta título propuesto <span style="opacity:0.4;font-size:8px">≤60</span></th><th style="min-width:260px">Meta descripción propuesta <span style="opacity:0.4;font-size:8px">≤160</span></th><th>Acción</th></tr></thead><tbody id="p-rtbody"></tbody></table></div>
-    <div class="apply-bar"><span class="apply-count" id="p-acount">0 aprobadas</span><button class="btn btn-primary" id="p-apply-btn" onclick="applyAll('products')" disabled>Aplicar en Shopify</button><div id="p-apply-msg"></div></div>
+    <div class="apply-bar"><span class="apply-count" id="p-acount">0 aprobadas</span><button class="btn btn-primary" id="p-apply-btn" onclick="applyAll('products')" disabled>Aplicar todos</button><div id="p-apply-msg"></div></div>
   </div>
   <div id="p-msg"></div>
 </div>
@@ -680,7 +680,7 @@ function adminUI(host) {
   <div class="results-section" id="c-results">
     <h2>Propuestas</h2><p class="results-subtitle" id="c-rsub"></p>
     <div class="results-wrap"><table class="rtbl"><thead><tr><th>Colección</th><th>Meta título actual</th><th style="min-width:200px">Meta título propuesto</th><th style="min-width:260px">Meta descripción propuesta</th><th>Acción</th></tr></thead><tbody id="c-rtbody"></tbody></table></div>
-    <div class="apply-bar"><span class="apply-count" id="c-acount">0 aprobadas</span><button class="btn btn-primary" id="c-apply-btn" onclick="applyAll('collections')" disabled>Aplicar en Shopify</button><div id="c-apply-msg"></div></div>
+    <div class="apply-bar"><span class="apply-count" id="c-acount">0 aprobadas</span><button class="btn btn-primary" id="c-apply-btn" onclick="applyAll('collections')" disabled>Aplicar todos</button><div id="c-apply-msg"></div></div>
   </div>
   <div id="c-msg"></div>
 </div>
@@ -712,7 +712,7 @@ function adminUI(host) {
   <div class="results-section" id="mo-results">
     <h2>Propuestas</h2><p class="results-subtitle" id="mo-rsub"></p>
     <div class="results-wrap"><table class="rtbl"><thead><tr><th>Metaobjeto</th><th>Meta título actual</th><th style="min-width:200px">Meta título propuesto</th><th style="min-width:260px">Meta descripción propuesta</th><th>Acción</th></tr></thead><tbody id="mo-rtbody"></tbody></table></div>
-    <div class="apply-bar"><span class="apply-count" id="mo-acount">0 aprobadas</span><button class="btn btn-primary" id="mo-apply-btn" onclick="applyAll('metaobjects')" disabled>Aplicar en Shopify</button><div id="mo-apply-msg"></div></div>
+    <div class="apply-bar"><span class="apply-count" id="mo-acount">0 aprobadas</span><button class="btn btn-primary" id="mo-apply-btn" onclick="applyAll('metaobjects')" disabled>Aplicar todos</button><div id="mo-apply-msg"></div></div>
   </div>
   <div id="mo-msg"></div>
 </div>
@@ -747,7 +747,7 @@ function adminUI(host) {
   <div class="results-section" id="art-results">
     <h2>Propuestas</h2><p class="results-subtitle" id="art-rsub"></p>
     <div class="results-wrap"><table class="rtbl"><thead><tr><th>Artículo</th><th>Meta título actual</th><th style="min-width:200px">Meta título propuesto</th><th style="min-width:260px">Meta descripción propuesta</th><th>Acción</th></tr></thead><tbody id="art-rtbody"></tbody></table></div>
-    <div class="apply-bar"><span class="apply-count" id="art-acount">0 aprobadas</span><button class="btn btn-primary" id="art-apply-btn" onclick="applyAll('articles')" disabled>Aplicar en Shopify</button><div id="art-apply-msg"></div></div>
+    <div class="apply-bar"><span class="apply-count" id="art-acount">0 aprobadas</span><button class="btn btn-primary" id="art-apply-btn" onclick="applyAll('articles')" disabled>Aplicar todos</button><div id="art-apply-msg"></div></div>
   </div>
   <div id="art-msg"></div>
 </div>
@@ -796,7 +796,7 @@ function adminUI(host) {
   <div class="results-section" id="img-results">
     <h2>Alt text propuesto</h2><p class="results-subtitle" id="img-rsub"></p>
     <div class="results-wrap"><table class="rtbl"><thead><tr><th>Imagen</th><th>Producto</th><th>Alt actual</th><th style="min-width:220px">Alt propuesto <span style="opacity:0.4;font-size:8px">≤120</span></th><th>Acción</th></tr></thead><tbody id="img-rtbody"></tbody></table></div>
-    <div class="apply-bar"><span class="apply-count" id="img-acount">0 aprobadas</span><button class="btn btn-primary" id="img-apply-btn" onclick="applyAll('images')" disabled>Aplicar en Shopify</button><div id="img-apply-msg"></div></div>
+    <div class="apply-bar"><span class="apply-count" id="img-acount">0 aprobadas</span><button class="btn btn-primary" id="img-apply-btn" onclick="applyAll('images')" disabled>Aplicar todos</button><div id="img-apply-msg"></div></div>
   </div>
   <div id="img-msg"></div>
 </div>
@@ -824,7 +824,7 @@ function adminUI(host) {
     <p class="subtitle" id="pend-rsub"></p>
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
       <span id="pend-acount" style="font-size:13px;color:#666"></span>
-      <button class="btn btn-primary" id="pend-apply-btn" onclick="applyPendingSEO()" disabled>Aplicar en Shopify</button>
+      <button class="btn btn-primary" id="pend-apply-btn" onclick="applyPendingSEO()" disabled>Aplicar todos</button>
       <span id="pend-apply-msg" class="msg" style="display:none"></span>
     </div>
     <div class="results-wrap"><table class="rtbl"><thead><tr><th>Producto</th><th>Meta título actual</th><th style="min-width:200px">Meta título propuesto <span style="opacity:0.4;font-size:8px">≤60</span></th><th style="min-width:260px">Meta descripción propuesta <span style="opacity:0.4;font-size:8px">≤160</span></th><th>Acción</th></tr></thead><tbody id="pend-rtbody"></tbody></table></div>
@@ -1439,7 +1439,7 @@ function appendResult(type, data, idx) {
       <td class="td-name">\${esc(data.productTitle)}</td>
       <td class="td-cur">\${esc(data.currentAlt||'(sin alt)')}</td>
       <td><input class="seo-inp" type="text" maxlength="125" value="\${esc(data.altText)}" oninput="charCount(this,120,'\${prefix}-cc-\${idx}')" id="\${prefix}-ai-\${idx}"><div class="char-c" id="\${prefix}-cc-\${idx}"></div></td>
-      <td class="td-act"><div style="display:flex;gap:5px;flex-direction:column"><button class="btn-ap on" id="\${prefix}-ba-\${idx}" onclick="setApp('\${type}',\${idx},true)">Aprobar</button><button class="btn-rj" id="\${prefix}-br-\${idx}" onclick="setApp('\${type}',\${idx},false)">Rechazar</button></div></td>
+      <td class="td-act"><button class="btn-ap on" id="\${prefix}-ba-\${idx}" onclick="applyOne('\${type}',\${idx},this)">Aplicar</button></td>
     \`;
     tbody.appendChild(tr);
     const inp=document.getElementById(prefix+'-ai-'+idx); if(inp) charCount(inp,120,prefix+'-cc-'+idx);
@@ -1449,7 +1449,7 @@ function appendResult(type, data, idx) {
       <td class="td-cur">\${esc(data.currentMetaTitle||'(sin meta título)')}</td>
       <td><input class="seo-inp" type="text" maxlength="65" value="\${esc(data.metaTitle)}" oninput="charCount(this,60,'\${prefix}-ct-\${idx}')" id="\${prefix}-ti-\${idx}"><div class="char-c" id="\${prefix}-ct-\${idx}"></div></td>
       <td><textarea class="seo-inp" maxlength="165" rows="3" oninput="charCount(this,160,'\${prefix}-cd-\${idx}')" id="\${prefix}-di-\${idx}">\${esc(data.metaDescription)}</textarea><div class="char-c" id="\${prefix}-cd-\${idx}"></div></td>
-      <td class="td-act"><div style="display:flex;gap:5px;flex-direction:column"><button class="btn-ap on" id="\${prefix}-ba-\${idx}" onclick="setApp('\${type}',\${idx},true)">Aprobar</button><button class="btn-rj" id="\${prefix}-br-\${idx}" onclick="setApp('\${type}',\${idx},false)">Rechazar</button></div></td>
+      <td class="td-act"><button class="btn-ap on" id="\${prefix}-ba-\${idx}" onclick="applyOne('\${type}',\${idx},this)">Aplicar</button></td>
     \`;
     tbody.appendChild(tr);
     const ti=document.getElementById(prefix+'-ti-'+idx); if(ti) charCount(ti,60,prefix+'-ct-'+idx);
@@ -1464,42 +1464,53 @@ function appendErrResult(prefix, data) {
   tbody.appendChild(tr);
 }
 
-function setApp(type, idx, approved) {
-  sections[type].results[idx].approved=approved;
+async function applyOne(type, idx, btn) {
   const prefix=typeMap[type];
-  document.getElementById(prefix+'-ba-'+idx).classList.toggle('on',approved);
-  document.getElementById(prefix+'-br-'+idx).classList.toggle('on',!approved);
-  document.getElementById(prefix+'-rr-'+idx).classList.toggle('rejected',!approved);
-  updateApplyCount(prefix, sections[type].results);
+  const r=sections[type].results[idx];
+  if (!r) return;
+  let item;
+  if (type==='images') item={...r, altText:(document.getElementById(prefix+'-ai-'+idx)?.value||r.altText).trim()};
+  else item={...r, metaTitle:(document.getElementById(prefix+'-ti-'+idx)?.value||r.metaTitle).trim(), metaDescription:(document.getElementById(prefix+'-di-'+idx)?.value||r.metaDescription).trim()};
+  btn.disabled=true; btn.textContent='Guardando…';
+  try {
+    const res=await fetch('/api/seo/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,items:[item]})}).then(r=>r.json());
+    if (res.errors?.length) { btn.textContent='Error'; btn.classList.add('btn-rj'); btn.classList.remove('btn-ap','on'); btn.disabled=false; return; }
+    btn.textContent='✓ Aplicado'; btn.classList.add('on'); btn.disabled=true;
+    res.applied.forEach(a => { if(a.id) processedIds[type].add(a.id); });
+    if (type==='products') renderProductTable(sections.products.items);
+    else if (type==='collections') renderCollTable();
+    updateApplyCount(prefix, sections[type].results);
+  } catch(e) { btn.textContent='Error'; btn.disabled=false; }
 }
 
-// ── Apply ─────────────────────────────────────────────────────────────────────
+// ── Apply all ─────────────────────────────────────────────────────────────────
 async function applyAll(type) {
   const prefix=typeMap[type];
   const toApply = sections[type].results
     .map((r,idx) => {
-      if (!r.approved) return null;
+      const btn=document.getElementById(prefix+'-ba-'+idx);
+      if (btn?.disabled && btn.textContent==='✓ Aplicado') return null;
       if (type==='images') return {...r, altText:(document.getElementById(prefix+'-ai-'+idx)?.value||r.altText).trim()};
       return {...r, metaTitle:(document.getElementById(prefix+'-ti-'+idx)?.value||r.metaTitle).trim(), metaDescription:(document.getElementById(prefix+'-di-'+idx)?.value||r.metaDescription).trim()};
     })
     .filter(Boolean);
-
   if (!toApply.length) return;
-  const btn=document.getElementById(prefix+'-apply-btn'); btn.disabled=true; btn.textContent='Aplicando…';
-
+  const applyBtn=document.getElementById(prefix+'-apply-btn'); applyBtn.disabled=true; applyBtn.textContent='Aplicando…';
   try {
     const res=await fetch('/api/seo/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,items:toApply})}).then(r=>r.json());
     const msgEl=document.getElementById(prefix+'-apply-msg');
     msgEl.className='msg '+(res.errors.length?'err':'ok');
     msgEl.textContent=res.applied.length+' actualizado(s) en Shopify.'+(res.errors.length?' '+res.errors.length+' error(es).':'');
     msgEl.style.display='block';
-    // Update checkmarks in table
-    res.applied.forEach(a => { if(a.id) processedIds[type].add(a.id); });
+    res.applied.forEach(a => {
+      if(a.id) processedIds[type].add(a.id);
+      const i=sections[type].results.findIndex(r=>r.productId===a.id||r.collectionId===a.id||r.metaobjectId===a.id||r.articleId===a.id||r.imageId===a.id);
+      if(i>=0){const b=document.getElementById(prefix+'-ba-'+i);if(b){b.textContent='✓ Aplicado';b.disabled=true;}}
+    });
     if (type==='products') renderProductTable(sections.products.items);
     else if (type==='collections') renderCollTable();
   } catch(e) { showSectionMsg(prefix,'Error al aplicar: '+e.message,'err'); }
-
-  btn.textContent='Aplicar en Shopify'; btn.disabled=false;
+  applyBtn.textContent='Aplicar todos'; applyBtn.disabled=false;
 }
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -1950,19 +1961,29 @@ function appendPendingResult(data, idx) {
     <td class="td-cur">\${esc(data.currentMetaTitle||'(sin meta título)')}</td>
     <td><input class="seo-inp" type="text" maxlength="65" value="\${esc(data.metaTitle)}" oninput="charCount(this,60,'pend-ct-\${idx}')" id="pend-ti-\${idx}"><div class="char-c" id="pend-ct-\${idx}"></div></td>
     <td><textarea class="seo-inp" maxlength="165" rows="3" oninput="charCount(this,160,'pend-cd-\${idx}')" id="pend-di-\${idx}">\${esc(data.metaDescription)}</textarea><div class="char-c" id="pend-cd-\${idx}"></div></td>
-    <td class="td-act"><div style="display:flex;gap:5px;flex-direction:column"><button class="btn-ap on" id="pend-ba-\${idx}" onclick="setPendingApp(\${idx},true)">Aprobar</button><button class="btn-rj" id="pend-br-\${idx}" onclick="setPendingApp(\${idx},false)">Rechazar</button></div></td>
+    <td class="td-act"><button class="btn-ap on" id="pend-ba-\${idx}" onclick="applyOnePending(\${idx},this)">Aplicar</button></td>
   \`;
   tbody.appendChild(tr);
   const ti=document.getElementById('pend-ti-'+idx); if(ti) charCount(ti,60,'pend-ct-'+idx);
   const di=document.getElementById('pend-di-'+idx); if(di) charCount(di,160,'pend-cd-'+idx);
 }
 
-function setPendingApp(idx, approved) {
-  pendingResults[idx].approved=approved;
-  document.getElementById('pend-ba-'+idx).classList.toggle('on',approved);
-  document.getElementById('pend-br-'+idx).classList.toggle('on',!approved);
-  document.getElementById('pend-rr-'+idx).classList.toggle('rejected',!approved);
-  updatePendingApplyCount();
+async function applyOnePending(idx, btn) {
+  const r=pendingResults[idx]; if(!r) return;
+  const item={...r, metaTitle:(document.getElementById('pend-ti-'+idx)?.value||r.metaTitle).trim(), metaDescription:(document.getElementById('pend-di-'+idx)?.value||r.metaDescription).trim()};
+  btn.disabled=true; btn.textContent='Guardando…';
+  try {
+    const res=await fetch('/api/seo/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'products',items:[item]})}).then(r=>r.json());
+    if (res.errors?.length) { btn.textContent='Error'; btn.classList.add('btn-rj'); btn.classList.remove('btn-ap','on'); btn.disabled=false; return; }
+    btn.textContent='✓ Aplicado'; btn.disabled=true;
+    for (const a of res.applied) {
+      await fetch('/api/pending/'+a.id, {method:'DELETE'});
+      pendingItems=pendingItems.filter(p=>p.id!==a.id);
+    }
+    renderPendingTable();
+    const badge=document.getElementById('pending-badge');
+    if (badge) { badge.textContent=pendingItems.length; badge.style.display=pendingItems.length?'inline-block':'none'; }
+  } catch(e) { btn.textContent='Error'; btn.disabled=false; }
 }
 
 function updatePendingApplyCount() {
