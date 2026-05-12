@@ -1766,7 +1766,7 @@ function renderResearch(data) {
       html += \`<label class="rkw-tag" id="rkw-\${idx}"><input type="checkbox" name="rterm" value="\${esc(t)}" checked onchange="updateResearchApply()"><span>\${esc(t)}</span></label>\`;
     });
     html += '</div>';
-    html += '<div class="rmanual-row"><input id="rmanual-input" placeholder="Agregar término manual…" onkeydown="if(event.key===\'Enter\')addManualTerm()"><button class="btn btn-secondary" onclick="addManualTerm()" style="white-space:nowrap;padding:7px 12px;font-size:11px">+ Agregar</button></div>';
+    html += '<div class="rmanual-row"><input id="rmanual-input" placeholder="Agregar término manual…" onkeydown="if(event.keyCode===13)addManualTerm()"><button class="btn btn-secondary" onclick="addManualTerm()" style="white-space:nowrap;padding:7px 12px;font-size:11px">+ Agregar</button></div>';
     html += '</div>';
   }
 
@@ -1811,7 +1811,7 @@ function applyResearch() {
   if (ta) {
     const existing = ta.value.trim();
     const injection = 'Términos clave a priorizar en el SEO: ' + terms.join(', ') + '.';
-    ta.value = existing ? existing + '\n' + injection : injection;
+    ta.value = existing ? existing + '\\n' + injection : injection;
   }
   document.getElementById('rmodal-overlay').classList.remove('open');
   document.querySelectorAll('.btn-research').forEach(b => b.classList.remove('active-research'));
