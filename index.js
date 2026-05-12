@@ -29,41 +29,17 @@ app.get('/admin', requireAuth, (req, res) => {
 });
 
 // ── Persistence ───────────────────────────────────────────────────────────────
-let store = { processedIds: { products: [], collections: [], metaobjects: [], articles: [], images: [] }, history: [], settings: { extraRules: '' }, pendingProducts: [] };
+let store = { history: [], settings: { extraRules: '', rules: [] } };
 try {
   const raw = JSON.parse(fs.readFileSync('./log.json', 'utf8'));
-  if (Array.isArray(raw)) {
-    store.history = raw;
-    raw.forEach(e => (e.applied || []).forEach(a => { if (a.productId && !store.processedIds.products.includes(a.productId)) store.processedIds.products.push(a.productId); }));
-  } else {
-    store = { ...store, ...raw };
-  }
+  if (raw && !Array.isArray(raw)) store = { ...store, ...raw };
 } catch {}
 
-const processedIds = {
-  products: new Set(store.processedIds?.products || []),
-  collections: new Set(store.processedIds?.collections || []),
-  metaobjects: new Set(store.processedIds?.metaobjects || []),
-  articles: new Set(store.processedIds?.articles || []),
-  images: new Set(store.processedIds?.images || []),
-};
-const changedUrls = {
-  products: new Set(store.changedUrls?.products || []),
-  collections: new Set(store.changedUrls?.collections || []),
-};
 let history = store.history || [];
 let settings = { extraRules: '', rules: [], ...(store.settings || {}) };
-let pendingProducts = store.pendingProducts || [];
 
 function saveStore() {
-  const data = {
-    processedIds: Object.fromEntries(Object.entries(processedIds).map(([k, v]) => [k, [...v]])),
-    changedUrls: { products: [...changedUrls.products], collections: [...changedUrls.collections] },
-    history,
-    settings,
-    pendingProducts,
-  };
-  try { fs.writeFileSync('./log.json', JSON.stringify(data, null, 2)); } catch {}
+  try { fs.writeFileSync('./log.json', JSON.stringify({ history, settings }, null, 2)); } catch {}
 }
 
 app.get('/api/settings', (req, res) => res.json(settings));
@@ -86,10 +62,7 @@ function getRulesForType(type) {
 }
 
 app.get('/api/processed-ids', (req, res) => {
-  res.json({
-    ...Object.fromEntries(Object.entries(processedIds).map(([k, v]) => [k, [...v]])),
-    changedUrls: { products: [...changedUrls.products], collections: [...changedUrls.collections] },
-  });
+  res.json({ products: [], collections: [], metaobjects: [], articles: [], images: [], changedUrls: { products: [], collections: [] } });
 });
 
 app.get('/api/history', (req, res) => res.json(history));
@@ -182,7 +155,6 @@ app.post('/api/url/apply', async (req, res) => {
     if (oldHandle && oldHandle !== newHandle) {
       shopify.createRedirect(prefix + oldHandle, prefix + handle).catch(e => console.warn('Redirect:', e.message));
     }
-    if (changedUrls[type]) changedUrls[type].add(gid);
     history.unshift({ date: new Date().toISOString(), type: 'url', applied: [{ id: gid, oldHandle, newHandle: handle }], errors: [] });
     if (history.length > 500) history.pop();
     saveStore();
@@ -258,23 +230,18 @@ app.post('/api/seo/apply', async (req, res) => {
     try {
       if (type === 'products') {
         await shopify.updateProductSEO(item.productGid, item.metaTitle, item.metaDescription);
-        processedIds.products.add(item.productId);
         applied.push({ id: item.productId, title: item.productTitle, metaTitle: item.metaTitle, metaDescription: item.metaDescription });
       } else if (type === 'collections') {
         await shopify.updateCollectionSEO(item.collectionGid, item.metaTitle, item.metaDescription);
-        processedIds.collections.add(item.collectionId);
         applied.push({ id: item.collectionId, title: item.collectionTitle, metaTitle: item.metaTitle, metaDescription: item.metaDescription });
       } else if (type === 'metaobjects') {
         await shopify.updateMetaobjectSEO(item.metaobjectGid, item.metaTitle, item.metaDescription);
-        processedIds.metaobjects.add(item.metaobjectId);
         applied.push({ id: item.metaobjectId, title: item.metaobjectTitle, metaTitle: item.metaTitle, metaDescription: item.metaDescription });
       } else if (type === 'articles') {
         await shopify.updateArticleSEO(item.articleGid, item.metaTitle, item.metaDescription);
-        processedIds.articles.add(item.articleId);
         applied.push({ id: item.articleId, title: item.articleTitle, metaTitle: item.metaTitle, metaDescription: item.metaDescription });
       } else if (type === 'images') {
         await shopify.updateImageAlt(item.productId, item.imageId, item.altText);
-        processedIds.images.add(item.imageId);
         applied.push({ id: item.imageId, title: item.productTitle, altText: item.altText });
       }
     } catch (e) {
@@ -312,44 +279,15 @@ app.post('/api/webhook/register', requireAuth, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── Pending Products (webhook) ────────────────────────────────────────────────
-app.post('/api/webhook/products/create', (req, res) => {
+// ── Pending Products ──────────────────────────────────────────────────────────
+app.post('/api/webhook/products/create', (req, res) => res.status(200).send('ok'));
+
+app.get('/api/products/pending', async (req, res) => {
   try {
-    const p = req.body;
-    if (!pendingProducts.find(x => x.id === String(p.id))) {
-      pendingProducts.push({
-        id: String(p.id),
-        gid: `gid://shopify/Product/${p.id}`,
-        title: p.title || '',
-        handle: p.handle || '',
-        status: (p.status || 'draft').toLowerCase(),
-        tags: Array.isArray(p.tags) ? p.tags : (p.tags || '').split(',').map(t => t.trim()).filter(Boolean),
-        vendor: p.vendor || '',
-        productType: p.product_type || '',
-        description: (p.body_html || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().substring(0, 600),
-        sku: p.variants?.[0]?.sku || '',
-        currentMetaTitle: p.seo_title || '',
-        currentMetaDescription: p.seo_description || '',
-        addedAt: new Date().toISOString(),
-      });
-      saveStore();
-    }
-  } catch (e) { console.error('Webhook parse error:', e.message); }
-  res.status(200).send('ok');
-});
-
-app.get('/api/pending', (req, res) => res.json(pendingProducts));
-
-app.delete('/api/pending/:id', (req, res) => {
-  pendingProducts = pendingProducts.filter(p => p.id !== req.params.id);
-  saveStore();
-  res.json({ ok: true });
-});
-
-app.delete('/api/pending', (req, res) => {
-  pendingProducts = [];
-  saveStore();
-  res.json({ ok: true });
+    const days = parseInt(req.query.days) || 90;
+    const products = await shopify.getProductsWithoutSEO(days);
+    res.json(products);
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 const FURNITURE_STYLES = [
@@ -631,7 +569,7 @@ function adminUI(host) {
       </div>
     </div>
     <div id="p-list"></div>
-    <div class="sel-row"><span class="sel-count" id="p-count"></span><div style="display:flex;gap:8px"><button class="sel-all-btn" id="p-sel-noseo" onclick="selWithoutSEO('p','products')" style="display:none">Selec. sin SEO</button><button class="sel-all-btn" id="p-selall" onclick="selAll('p')" style="display:none">Seleccionar todos</button></div></div>
+    <div class="sel-row"><span class="sel-count" id="p-count"></span><div style="display:flex;gap:8px"><button class="sel-all-btn" id="p-sel-noseo" onclick="selWithoutSEO('p')" style="display:none">Selec. sin SEO</button><button class="sel-all-btn" id="p-selall" onclick="selAll('p')" style="display:none">Seleccionar todos</button></div></div>
   </div>
   <div style="margin-top:14px" id="p-one-time-wrap">
     <label style="font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:#9a7f5a;display:block;margin-bottom:5px">Instrucción puntual para esta generación <span style="opacity:0.5;font-size:9px;text-transform:none;letter-spacing:0">(opcional — no se guarda)</span></label>
@@ -665,7 +603,7 @@ function adminUI(host) {
       <div class="seo-filter"><button class="seo-filter-btn active" data-mf="all" onclick="setMetaFilter('collections','all',this)">Todos</button><button class="seo-filter-btn" data-mf="incomplete" onclick="setMetaFilter('collections','incomplete',this)">Sin completar</button><button class="seo-filter-btn" data-mf="complete" onclick="setMetaFilter('collections','complete',this)">Completo</button></div>
     </div>
     <div id="c-list"></div>
-    <div class="sel-row"><span class="sel-count" id="c-count"></span><div style="display:flex;gap:8px"><button class="sel-all-btn" id="c-sel-noseo" onclick="selWithoutSEO('c','collections')" style="display:none">Selec. sin SEO</button><button class="sel-all-btn" id="c-selall" onclick="selAll('c')" style="display:none">Seleccionar todos</button></div></div>
+    <div class="sel-row"><span class="sel-count" id="c-count"></span><div style="display:flex;gap:8px"><button class="sel-all-btn" id="c-sel-noseo" onclick="selWithoutSEO('c')" style="display:none">Selec. sin SEO</button><button class="sel-all-btn" id="c-selall" onclick="selAll('c')" style="display:none">Seleccionar todos</button></div></div>
   </div>
   <div style="margin-top:14px">
     <label style="font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:#9a7f5a;display:block;margin-bottom:5px">Instrucción puntual para esta generación <span style="opacity:0.5;font-size:9px;text-transform:none;letter-spacing:0">(opcional — no se guarda)</span></label>
@@ -697,7 +635,7 @@ function adminUI(host) {
       <div class="seo-filter"><button class="seo-filter-btn active" data-mf="all" onclick="setMetaFilter('metaobjects','all',this)">Todos</button><button class="seo-filter-btn" data-mf="incomplete" onclick="setMetaFilter('metaobjects','incomplete',this)">Sin completar</button><button class="seo-filter-btn" data-mf="complete" onclick="setMetaFilter('metaobjects','complete',this)">Completo</button></div>
     </div>
     <div id="mo-list"></div>
-    <div class="sel-row"><span class="sel-count" id="mo-count"></span><div style="display:flex;gap:8px"><button class="sel-all-btn" id="mo-sel-noseo" onclick="selWithoutSEO('mo','metaobjects')" style="display:none">Selec. sin SEO</button><button class="sel-all-btn" id="mo-selall" onclick="selAll('mo')" style="display:none">Seleccionar todos</button></div></div>
+    <div class="sel-row"><span class="sel-count" id="mo-count"></span><div style="display:flex;gap:8px"><button class="sel-all-btn" id="mo-sel-noseo" onclick="selWithoutSEO('mo')" style="display:none">Selec. sin SEO</button><button class="sel-all-btn" id="mo-selall" onclick="selAll('mo')" style="display:none">Seleccionar todos</button></div></div>
   </div>
   <div style="margin-top:14px">
     <label style="font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:#9a7f5a;display:block;margin-bottom:5px">Instrucción puntual para esta generación <span style="opacity:0.5;font-size:9px;text-transform:none;letter-spacing:0">(opcional — no se guarda)</span></label>
@@ -732,7 +670,7 @@ function adminUI(host) {
       <div class="seo-filter"><button class="seo-filter-btn active" data-mf="all" onclick="setMetaFilter('articles','all',this)">Todos</button><button class="seo-filter-btn" data-mf="incomplete" onclick="setMetaFilter('articles','incomplete',this)">Sin completar</button><button class="seo-filter-btn" data-mf="complete" onclick="setMetaFilter('articles','complete',this)">Completo</button></div>
     </div>
     <div id="art-list"></div>
-    <div class="sel-row"><span class="sel-count" id="art-count"></span><div style="display:flex;gap:8px"><button class="sel-all-btn" id="art-sel-noseo" onclick="selWithoutSEO('art','articles')" style="display:none">Selec. sin SEO</button><button class="sel-all-btn" id="art-selall" onclick="selAll('art')" style="display:none">Seleccionar todos</button></div></div>
+    <div class="sel-row"><span class="sel-count" id="art-count"></span><div style="display:flex;gap:8px"><button class="sel-all-btn" id="art-sel-noseo" onclick="selWithoutSEO('art')" style="display:none">Selec. sin SEO</button><button class="sel-all-btn" id="art-selall" onclick="selAll('art')" style="display:none">Seleccionar todos</button></div></div>
   </div>
   <div style="margin-top:14px">
     <label style="font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:#9a7f5a;display:block;margin-bottom:5px">Instrucción puntual para esta generación <span style="opacity:0.5;font-size:9px;text-transform:none;letter-spacing:0">(opcional — no se guarda)</span></label>
@@ -782,7 +720,7 @@ function adminUI(host) {
       <div class="seo-filter"><button class="seo-filter-btn active" data-mf="all" onclick="setMetaFilter('images','all',this)">Todos</button><button class="seo-filter-btn" data-mf="incomplete" onclick="setMetaFilter('images','incomplete',this)">Sin alt</button><button class="seo-filter-btn" data-mf="complete" onclick="setMetaFilter('images','complete',this)">Con alt</button></div>
     </div>
     <div id="img-list"></div>
-    <div class="sel-row"><span class="sel-count" id="img-count"></span><div style="display:flex;gap:8px"><button class="sel-all-btn" id="img-sel-noseo" onclick="selWithoutSEO('img','images')" style="display:none">Selec. sin SEO</button><button class="sel-all-btn" id="img-selall" onclick="selAll('img')" style="display:none">Seleccionar todas</button></div></div>
+    <div class="sel-row"><span class="sel-count" id="img-count"></span><div style="display:flex;gap:8px"><button class="sel-all-btn" id="img-sel-noseo" onclick="selWithoutSEO('img')" style="display:none">Selec. sin SEO</button><button class="sel-all-btn" id="img-selall" onclick="selAll('img')" style="display:none">Seleccionar todas</button></div></div>
   </div>
   <div style="margin-top:14px">
     <label style="font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:#9a7f5a;display:block;margin-bottom:5px">Instrucción puntual para esta generación <span style="opacity:0.5;font-size:9px;text-transform:none;letter-spacing:0">(opcional — no se guarda)</span></label>
@@ -912,7 +850,6 @@ const sections = {
   articles:    { prefix:'art', items:[], results:[], seoFilter:'all', metaFilter:'all' },
   images:      { prefix:'img', items:[], results:[], seoFilter:'all', metaFilter:'all' },
 };
-let processedIds = { products:new Set(), collections:new Set(), metaobjects:new Set(), articles:new Set(), images:new Set() };
 let changedUrlIds = { products:new Set(), collections:new Set() };
 let pFilterType = 'collection';
 let imgFilterType = 'collection';
@@ -927,13 +864,8 @@ const FURNITURE_COLLECTIONS = [
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
-  const [cols, pids] = await Promise.all([
-    fetch('/api/collections').then(r=>r.json()),
-    fetch('/api/processed-ids').then(r=>r.json()),
-  ]);
+  const cols = await fetch('/api/collections').then(r=>r.json());
   loadPendingBadge();
-  Object.keys(pids).forEach(k => { if (k !== 'changedUrls') processedIds[k] = new Set(pids[k]); });
-  if (pids.changedUrls) { changedUrlIds.products = new Set(pids.changedUrls.products||[]); changedUrlIds.collections = new Set(pids.changedUrls.collections||[]); }
   ['p-col','img-col'].forEach(id => {
     const sel = document.getElementById(id);
     cols.forEach(c => { const o = document.createElement('option'); o.value=c.id; o.textContent=c.title; sel.appendChild(o); });
@@ -993,9 +925,12 @@ function setMetaFilter(type, f, btn) {
   else if (type==='images') renderImgTable();
 }
 
-function selWithoutSEO(prefix, type) {
+function selWithoutSEO(prefix) {
   const all = document.querySelectorAll('[name="'+prefix+'_item"]');
-  all.forEach(cb => { cb.checked = !processedIds[type].has(cb.value); });
+  all.forEach(cb => {
+    try { const obj = JSON.parse(cb.dataset.obj||'{}'); cb.checked = !obj.currentMetaTitle; }
+    catch { cb.checked = true; }
+  });
   afterSelChange(prefix);
 }
 
@@ -1120,8 +1055,8 @@ async function loadProducts() {
 function renderProductTable(products) {
   const { seoFilter, metaFilter, statusFilter, stockFilter, urlFilter, descFilter } = sections.products;
   let filtered = products;
-  if (seoFilter === 'done')   filtered = filtered.filter(p => processedIds.products.has(p.id));
-  else if (seoFilter === 'none') filtered = filtered.filter(p => !processedIds.products.has(p.id));
+  if (seoFilter === 'done')   filtered = filtered.filter(p => p.currentMetaTitle);
+  else if (seoFilter === 'none') filtered = filtered.filter(p => !p.currentMetaTitle);
   if (metaFilter === 'complete')   filtered = filtered.filter(p => p.currentMetaTitle && p.currentMetaDescription);
   else if (metaFilter === 'incomplete') filtered = filtered.filter(p => !p.currentMetaTitle || !p.currentMetaDescription);
   if (statusFilter === 'active') filtered = filtered.filter(p => p.status === 'active');
@@ -1476,7 +1411,11 @@ async function applyOne(type, idx, btn) {
     const res=await fetch('/api/seo/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,items:[item]})}).then(r=>r.json());
     if (res.errors?.length) { btn.textContent='Error'; btn.classList.add('btn-rj'); btn.classList.remove('btn-ap','on'); btn.disabled=false; return; }
     btn.textContent='✓ Aplicado'; btn.classList.add('on'); btn.disabled=true;
-    res.applied.forEach(a => { if(a.id) processedIds[type].add(a.id); });
+    res.applied.forEach(a => {
+      const arr = sections[type].items;
+      const it = arr.find(x => x.id === a.id || x.gid === a.id);
+      if (it) { it.currentMetaTitle = a.metaTitle||it.currentMetaTitle; it.currentMetaDescription = a.metaDescription||it.currentMetaDescription; }
+    });
     if (type==='products') renderProductTable(sections.products.items);
     else if (type==='collections') renderCollTable();
     updateApplyCount(prefix, sections[type].results);
@@ -1503,7 +1442,9 @@ async function applyAll(type) {
     msgEl.textContent=res.applied.length+' actualizado(s) en Shopify.'+(res.errors.length?' '+res.errors.length+' error(es).':'');
     msgEl.style.display='block';
     res.applied.forEach(a => {
-      if(a.id) processedIds[type].add(a.id);
+      const arr = sections[type].items;
+      const it = arr.find(x => x.id === a.id || x.gid === a.id);
+      if (it) { it.currentMetaTitle = a.metaTitle||it.currentMetaTitle; it.currentMetaDescription = a.metaDescription||it.currentMetaDescription; }
       const i=sections[type].results.findIndex(r=>r.productId===a.id||r.collectionId===a.id||r.metaobjectId===a.id||r.articleId===a.id||r.imageId===a.id);
       if(i>=0){const b=document.getElementById(prefix+'-ba-'+i);if(b){b.textContent='✓ Aplicado';b.disabled=true;}}
     });
@@ -1836,15 +1777,16 @@ let pendingResults = [];
 
 async function loadPendingBadge() {
   try {
-    const data = await fetch('/api/pending').then(r=>r.json());
+    const data = await fetch('/api/products/pending').then(r=>r.json());
     const badge = document.getElementById('pending-badge');
     if (badge) { badge.textContent = data.length; badge.style.display = data.length ? 'inline-block' : 'none'; }
   } catch(e) {}
 }
 
 async function loadPending() {
+  document.getElementById('pend-list').innerHTML='<p class="empty-msg">Consultando Shopify…</p>';
   try {
-    pendingItems = await fetch('/api/pending').then(r=>r.json());
+    pendingItems = await fetch('/api/products/pending').then(r=>r.json());
     renderPendingTable();
     const badge = document.getElementById('pending-badge');
     if (badge) { badge.textContent = pendingItems.length; badge.style.display = pendingItems.length ? 'inline-block' : 'none'; }
@@ -1858,21 +1800,20 @@ function renderPendingTable() {
   const countEl = document.getElementById('pend-count');
   const genBtn = document.getElementById('pend-gen-btn');
   if (!pendingItems.length) {
-    list.innerHTML='<p class="empty-msg">No hay productos pendientes. Cuando agregues un producto en Shopify aparecerá aquí automáticamente.</p>';
+    list.innerHTML='<p class="empty-msg">No hay productos sin SEO en los últimos 90 días.</p>';
     if (countEl) countEl.textContent='';
     if (genBtn) genBtn.disabled=true;
     return;
   }
-  if (countEl) countEl.textContent = pendingItems.length+' producto(s) pendiente(s)';
+  if (countEl) countEl.textContent = pendingItems.length+' producto(s) sin SEO';
   if (genBtn) genBtn.disabled=false;
-  list.innerHTML=\`<table class="tbl"><thead><tr><th style="width:30px"></th><th>Título</th><th>SKU</th><th>Estado</th><th>Agregado</th><th style="width:32px"></th></tr></thead><tbody>
+  list.innerHTML=\`<table class="tbl"><thead><tr><th style="width:30px"></th><th>Título</th><th>SKU</th><th>Estado</th><th style="width:32px"></th></tr></thead><tbody>
     \${pendingItems.map((p,i)=>\`<tr onclick="togglePendingRow(\${i})">
       <td><input type="checkbox" name="pend_item" value="\${p.id}" data-idx="\${i}" checked onchange="updatePendingCount();event.stopPropagation()"></td>
       <td>\${esc(p.title)}</td>
       <td style="color:#aaa">\${esc(p.sku||'—')}</td>
       <td><span class="status-badge \${p.status==='active'?'s-active':'s-draft'}">\${p.status==='active'?'Activo':'Borrador'}</span></td>
-      <td style="color:#aaa;font-size:11px">\${new Date(p.addedAt).toLocaleDateString('es-CL')}</td>
-      <td><button onclick="dismissPending('\${p.id}');event.stopPropagation()" style="background:none;border:none;color:#bbb;cursor:pointer;font-size:14px;padding:2px 4px" title="Descartar">✕</button></td>
+      <td><button onclick="dismissPending('\${p.id}');event.stopPropagation()" style="background:none;border:none;color:#bbb;cursor:pointer;font-size:14px;padding:2px 4px" title="Ignorar esta vez">✕</button></td>
     </tr>\`).join('')}
   </tbody></table>\`;
   updatePendingCount();
@@ -1889,17 +1830,15 @@ function updatePendingCount() {
   if (genBtn) genBtn.disabled = !n;
 }
 
-async function dismissPending(id) {
-  await fetch('/api/pending/'+id, {method:'DELETE'});
+function dismissPending(id) {
   pendingItems = pendingItems.filter(p=>p.id!==id);
   renderPendingTable();
   const badge = document.getElementById('pending-badge');
   if (badge) { badge.textContent=pendingItems.length; badge.style.display=pendingItems.length?'inline-block':'none'; }
 }
 
-async function clearPending() {
-  if (!confirm('¿Limpiar toda la lista de pendientes?')) return;
-  await fetch('/api/pending', {method:'DELETE'});
+function clearPending() {
+  if (!confirm('¿Limpiar la lista? Se recargará desde Shopify la próxima vez.')) return;
   pendingItems=[];
   renderPendingTable();
   const badge=document.getElementById('pending-badge');
@@ -1976,10 +1915,7 @@ async function applyOnePending(idx, btn) {
     const res=await fetch('/api/seo/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'products',items:[item]})}).then(r=>r.json());
     if (res.errors?.length) { btn.textContent='Error'; btn.classList.add('btn-rj'); btn.classList.remove('btn-ap','on'); btn.disabled=false; return; }
     btn.textContent='✓ Aplicado'; btn.disabled=true;
-    for (const a of res.applied) {
-      await fetch('/api/pending/'+a.id, {method:'DELETE'});
-      pendingItems=pendingItems.filter(p=>p.id!==a.id);
-    }
+    res.applied.forEach(a => { pendingItems=pendingItems.filter(p=>p.id!==a.id); });
     renderPendingTable();
     const badge=document.getElementById('pending-badge');
     if (badge) { badge.textContent=pendingItems.length; badge.style.display=pendingItems.length?'inline-block':'none'; }
@@ -2004,10 +1940,7 @@ async function applyPendingSEO() {
     msgEl.className='msg '+(res.errors.length?'err':'ok');
     msgEl.textContent=res.applied.length+' actualizado(s) en Shopify.'+(res.errors.length?' '+res.errors.length+' error(es).':'');
     msgEl.style.display='block';
-    for (const a of res.applied) {
-      await fetch('/api/pending/'+a.id, {method:'DELETE'});
-      pendingItems=pendingItems.filter(p=>p.id!==a.id);
-    }
+    res.applied.forEach(a => { pendingItems=pendingItems.filter(p=>p.id!==a.id); });
     renderPendingTable();
     const badge=document.getElementById('pending-badge');
     if (badge) { badge.textContent=pendingItems.length; badge.style.display=pendingItems.length?'inline-block':'none'; }

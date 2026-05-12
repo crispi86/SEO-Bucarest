@@ -386,6 +386,18 @@ async function createRedirect(path, target) {
   return true;
 }
 
+async function getProductsWithoutSEO(daysAgo = 90) {
+  const since = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  let all = [];
+  let cursor = null;
+  do {
+    const result = await getProductsByQuery(`created_at:>=${since}`, 250, cursor);
+    result.products.filter(p => !p.currentMetaTitle).forEach(p => all.push(p));
+    cursor = result.pageInfo?.hasNextPage ? result.pageInfo.endCursor : null;
+  } while (cursor);
+  return all.sort((a, b) => b.id.localeCompare(a.id));
+}
+
 module.exports = {
   graphqlRequest,
   getProductsByCollection, getProductsByQuery, updateProductSEO,
@@ -394,4 +406,5 @@ module.exports = {
   getBlogArticles, updateArticleSEO,
   getProductsWithImages, updateImageAlt,
   updateProductHandle, updateCollectionHandle, createRedirect,
+  getProductsWithoutSEO,
 };
