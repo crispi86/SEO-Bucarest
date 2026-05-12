@@ -373,6 +373,22 @@ const FURNITURE_RULES = `REGLAS ESPECIALES PARA MUEBLES ANTIGUOS:
 • NUNCA incluir medidas, dimensiones ni centímetros en el metatítulo, aunque aparezcan en el título o la descripción del producto.
 • Metadescripción: desarrollar origen, estilo, material y antigüedad con lenguaje elegante. Las medidas pueden mencionarse aquí si aportan valor.`;
 
+// ── Test web search (temporal) ────────────────────────────────────────────────
+app.get('/api/test-websearch', requireAuth, async (req, res) => {
+  const Anthropic = require('@anthropic-ai/sdk');
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  try {
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 200,
+      tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 1 }],
+      messages: [{ role: 'user', content: 'Busca: "cómoda antigua francesa precio Chile"' }],
+    });
+    const used = response.content.some(b => b.type === 'tool_use' && b.name === 'web_search');
+    res.json({ available: used, stop_reason: response.stop_reason });
+  } catch(e) { res.json({ available: false, error: e.message }); }
+});
+
 // ── Start ─────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => console.log(`SEO Manager corriendo en puerto ${PORT}`));
