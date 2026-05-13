@@ -296,6 +296,15 @@ app.get('/api/images/pending', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+app.post('/api/image/rename', async (req, res) => {
+  const { productGid, imageUrl, newFilename, altText } = req.body;
+  if (!productGid || !imageUrl || !newFilename) return res.status(400).json({ error: 'Faltan parámetros' });
+  try {
+    const result = await shopify.renameAndUpdateImage(productGid, imageUrl, newFilename, altText || '');
+    res.json({ ok: true, ...result });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 const FURNITURE_STYLES = [
   'Luis XV','Luis XVI','Transicion','Transición','Regencia','Sheraton',
   'Georgian','Victoriano','Directorio','Edwardian','Louis Philippe',
@@ -807,7 +816,7 @@ function adminUI(host) {
         <button class="btn btn-primary" id="pend-img-apply-btn" onclick="applyPendingImgAlt()" disabled>Aplicar todos</button>
         <span id="pend-img-apply-msg" class="msg" style="display:none"></span>
       </div>
-      <div class="results-wrap"><table class="rtbl"><thead><tr><th>Imagen</th><th>Producto</th><th>Alt actual</th><th style="min-width:220px">Alt propuesto <span style="opacity:0.4;font-size:8px">≤120</span></th><th>Acción</th></tr></thead><tbody id="pend-img-rtbody"></tbody></table></div>
+      <div class="results-wrap"><table class="rtbl"><thead><tr><th>Imagen</th><th>Producto</th><th>Alt actual</th><th style="min-width:220px">Alt propuesto <span style="opacity:0.4;font-size:8px">≤120</span></th><th style="min-width:180px">Nombre de archivo <span style="opacity:0.4;font-size:8px">SEO</span></th><th>Acción</th></tr></thead><tbody id="pend-img-rtbody"></tbody></table></div>
     </div>
     <div id="pend-img-msg"></div>
   </div>
@@ -2077,20 +2086,38 @@ async function generatePendingImgAlt() {
     document.getElementById('pend-img-pfill').style.width=Math.round(data.index/total*100)+'%';
     document.getElementById('pend-img-plbl').textContent='Procesando '+data.index+' de '+total+'…';
     if(!data.error){pendingImgResults.push({...data,approved:true});appendPendingImgResult(data,pendingImgResults.length-1);}
-    else{const tr=document.createElement('tr');tr.innerHTML=\`<td colspan="5" style="color:#c0392b;font-size:11px;padding:8px 12px">Error en "\${esc(data.itemTitle||data.productTitle||'?')}": \${esc(data.error)}</td>\`;document.getElementById('pend-img-rtbody').appendChild(tr);}
+    else{const tr=document.createElement('tr');tr.innerHTML=\`<td colspan="6" style="color:#c0392b;font-size:11px;padding:8px 12px">Error en "\${esc(data.itemTitle||data.productTitle||'?')}": \${esc(data.error)}</td>\`;document.getElementById('pend-img-rtbody').appendChild(tr);}
     updatePendingImgApplyCount();
   };
   es.onerror=()=>{es.close();document.getElementById('pend-img-prog').style.display='none';document.getElementById('pend-img-gen-btn').disabled=false;if(pendingImgResults.length){document.getElementById('pend-img-results').style.display='block';updatePendingImgApplyCount();}};
 }
 
+function pendingImgSlug(url) {
+  const ext = (url||'').split('?')[0].split('.').pop().toLowerCase() || 'jpg';
+  return ext;
+}
+
+function syncPendingImgFilename(idx) {
+  const altInp = document.getElementById('pend-img-ai-'+idx);
+  const fnInp  = document.getElementById('pend-img-fn-'+idx);
+  if (!altInp || !fnInp || fnInp.dataset.userEdited) return;
+  const ext = fnInp.dataset.ext || 'jpg';
+  const slug = generateSlug(altInp.value);
+  fnInp.value = slug ? slug+'.'+ext : '';
+}
+
 function appendPendingImgResult(data, idx) {
   const tbody=document.getElementById('pend-img-rtbody');
   const tr=document.createElement('tr'); tr.id='pend-img-rr-'+idx;
+  const ext = pendingImgSlug(data.url||'');
+  const initSlug = generateSlug(data.altText||'');
+  const initFilename = initSlug ? initSlug+'.'+ext : '';
   tr.innerHTML=\`
     <td><img src="\${esc(data.url||'')}" style="width:50px;height:50px;object-fit:cover;border:1px solid #eee"></td>
     <td class="td-name">\${esc(data.productTitle)}</td>
     <td class="td-cur">\${esc(data.currentAlt||'(vacío)')}</td>
-    <td><input class="seo-inp" type="text" maxlength="125" value="\${esc(data.altText)}" oninput="charCount(this,120,'pend-img-ca-\${idx}')" id="pend-img-ai-\${idx}"><div class="char-c" id="pend-img-ca-\${idx}"></div></td>
+    <td><input class="seo-inp" type="text" maxlength="125" value="\${esc(data.altText)}" oninput="charCount(this,120,'pend-img-ca-\${idx}');syncPendingImgFilename(\${idx})" id="pend-img-ai-\${idx}"><div class="char-c" id="pend-img-ca-\${idx}"></div></td>
+    <td><input class="seo-inp" type="text" placeholder="nombre-archivo.jpg" value="\${esc(initFilename)}" data-ext="\${ext}" oninput="this.dataset.userEdited='1'" id="pend-img-fn-\${idx}" style="font-size:11px"></td>
     <td class="td-act"><button class="btn-ap on" id="pend-img-ba-\${idx}" onclick="applyOnePendingImg(\${idx},this)">Aplicar</button></td>
   \`;
   tbody.appendChild(tr);
@@ -2106,34 +2133,60 @@ function updatePendingImgApplyCount() {
 async function applyOnePendingImg(idx, btn) {
   const r=pendingImgResults[idx]; if(!r) return;
   const altText=(document.getElementById('pend-img-ai-'+idx)?.value||r.altText).trim();
-  const item={...r, altText};
-  btn.disabled=true; btn.textContent='Guardando…';
+  const newFilename=(document.getElementById('pend-img-fn-'+idx)?.value||'').trim();
+  const currentFilename=(r.url||'').split('?')[0].split('/').pop();
+  btn.disabled=true;
   try {
-    const res=await fetch('/api/seo/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'images',items:[item]})}).then(r=>r.json());
-    if(res.errors?.length){btn.textContent='Error';btn.classList.add('btn-rj');btn.classList.remove('btn-ap','on');btn.disabled=false;return;}
-    btn.textContent='✓ Aplicado'; btn.disabled=true;
-    res.applied.forEach(a=>{pendingImages=pendingImages.filter(img=>img.id!==a.id);});
+    if (newFilename && newFilename !== currentFilename) {
+      btn.textContent='Renombrando…';
+      const res=await fetch('/api/image/rename',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({productGid:r.productGid,imageUrl:r.url,newFilename,altText})}).then(x=>x.json());
+      if(res.error){btn.textContent='Error: '+res.error.slice(0,40);btn.classList.add('btn-rj');btn.classList.remove('btn-ap','on');btn.disabled=false;return;}
+    } else {
+      btn.textContent='Guardando…';
+      const res=await fetch('/api/seo/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'images',items:[{...r,altText}]})}).then(x=>x.json());
+      if(res.errors?.length){btn.textContent='Error';btn.classList.add('btn-rj');btn.classList.remove('btn-ap','on');btn.disabled=false;return;}
+    }
+    btn.textContent='✓ Aplicado'; btn.classList.add('on'); btn.disabled=true;
+    pendingImages=pendingImages.filter(img=>img.id!==r.imageId&&img.id!==r.id);
     renderPendingImagesTable();
   } catch(e){btn.textContent='Error';btn.disabled=false;}
 }
 
 async function applyPendingImgAlt() {
-  const toApply=pendingImgResults
-    .map((r,idx)=>r.approved?{...r,altText:(document.getElementById('pend-img-ai-'+idx)?.value||r.altText).trim()}:null)
-    .filter(Boolean);
+  const toApply=pendingImgResults.map((r,idx)=>{
+    if (!r.approved) return null;
+    const altText=(document.getElementById('pend-img-ai-'+idx)?.value||r.altText).trim();
+    const newFilename=(document.getElementById('pend-img-fn-'+idx)?.value||'').trim();
+    const currentFilename=(r.url||'').split('?')[0].split('/').pop();
+    return {...r, altText, newFilename: (newFilename && newFilename!==currentFilename) ? newFilename : null};
+  }).filter(Boolean);
   if(!toApply.length) return;
   const btn=document.getElementById('pend-img-apply-btn'); btn.disabled=true; btn.textContent='Aplicando…';
-  try {
-    const res=await fetch('/api/seo/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'images',items:toApply})}).then(r=>r.json());
-    const msgEl=document.getElementById('pend-img-apply-msg');
-    msgEl.className='msg '+(res.errors.length?'err':'ok');
-    msgEl.textContent=res.applied.length+' actualizada(s).'+(res.errors.length?' '+res.errors.length+' error(es).':'');
-    msgEl.style.display='block';
-    res.applied.forEach(a=>{pendingImages=pendingImages.filter(img=>img.id!==a.id);});
-    renderPendingImagesTable();
-    pendingImgResults=pendingImgResults.filter(r=>!res.applied.find(a=>a.id===r.imageId));
-    updatePendingImgApplyCount();
-  } catch(e){document.getElementById('pend-img-apply-msg').className='msg err';document.getElementById('pend-img-apply-msg').textContent='Error: '+e.message;document.getElementById('pend-img-apply-msg').style.display='block';}
+  const msgEl=document.getElementById('pend-img-apply-msg');
+  let ok=0, errors=0;
+  const toRename=toApply.filter(r=>r.newFilename);
+  const toAltOnly=toApply.filter(r=>!r.newFilename);
+  for (let i=0;i<toRename.length;i++) {
+    const r=toRename[i];
+    btn.textContent=\`Renombrando \${i+1}/\${toRename.length}…\`;
+    try {
+      const res=await fetch('/api/image/rename',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({productGid:r.productGid,imageUrl:r.url,newFilename:r.newFilename,altText:r.altText})}).then(x=>x.json());
+      if(res.error) errors++; else { ok++; pendingImages=pendingImages.filter(img=>img.id!==r.imageId&&img.id!==r.id); }
+    } catch { errors++; }
+  }
+  if(toAltOnly.length) {
+    btn.textContent='Guardando alt…';
+    try {
+      const res=await fetch('/api/seo/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'images',items:toAltOnly})}).then(x=>x.json());
+      ok+=res.applied.length; errors+=res.errors.length;
+      res.applied.forEach(a=>{pendingImages=pendingImages.filter(img=>img.id!==a.id);});
+    } catch { errors+=toAltOnly.length; }
+  }
+  msgEl.className='msg '+(errors?'err':'ok');
+  msgEl.textContent=ok+' actualizada(s).'+(errors?' '+errors+' error(es).':'');
+  msgEl.style.display='block';
+  renderPendingImagesTable();
+  updatePendingImgApplyCount();
   btn.textContent='Aplicar todos'; btn.disabled=false;
 }
 

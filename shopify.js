@@ -386,6 +386,114 @@ async function createRedirect(path, target) {
   return true;
 }
 
+function detectMimeType(url) {
+  const ext = (url.split('?')[0].toLowerCase().split('.').pop() || '');
+  return { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif' }[ext] || 'image/jpeg';
+}
+
+function fetchImageBytes(url) {
+  return new Promise((resolve, reject) => {
+    const mod = url.startsWith('https') ? https : require('http');
+    mod.get(url, res => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        return fetchImageBytes(res.headers.location).then(resolve).catch(reject);
+      }
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => resolve(Buffer.concat(chunks)));
+      res.on('error', reject);
+    }).on('error', reject);
+  });
+}
+
+function uploadToStaged(targetUrl, parameters, imageData, mimeType, filename) {
+  return new Promise((resolve, reject) => {
+    const boundary = 'FormBoundary' + Date.now().toString(16) + Math.random().toString(16).slice(2);
+    const fieldParts = parameters.map(p =>
+      `--${boundary}\r\nContent-Disposition: form-data; name="${p.name}"\r\n\r\n${p.value}`
+    ).join('\r\n');
+    const fileHeader = `\r\n--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: ${mimeType}\r\n\r\n`;
+    const footer = `\r\n--${boundary}--\r\n`;
+    const body = Buffer.concat([Buffer.from(fieldParts + fileHeader), imageData, Buffer.from(footer)]);
+    const parsed = new URL(targetUrl);
+    const req = https.request({
+      hostname: parsed.hostname, port: parsed.port || 443,
+      path: parsed.pathname + parsed.search, method: 'POST',
+      headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}`, 'Content-Length': body.length },
+    }, res => {
+      let resp = '';
+      res.on('data', c => resp += c);
+      res.on('end', () => {
+        if (res.statusCode < 300 || res.statusCode === 303) resolve(resp);
+        else reject(new Error(`Upload HTTP ${res.statusCode}: ${resp.slice(0, 200)}`));
+      });
+    });
+    req.on('error', reject);
+    req.write(body); req.end();
+  });
+}
+
+async function getProductMediaGidByUrl(productGid, imageUrl) {
+  const cleanUrl = imageUrl.split('?')[0];
+  const result = await graphqlRequest(`{
+    product(id: ${JSON.stringify(productGid)}) {
+      media(first: 50) { edges { node { id ... on MediaImage { image { url } } } } }
+    }
+  }`);
+  const edge = (result?.data?.product?.media?.edges || []).find(e => {
+    const u = e.node?.image?.url;
+    return u && u.split('?')[0] === cleanUrl;
+  });
+  return edge?.node?.id || null;
+}
+
+async function renameAndUpdateImage(productGid, imageUrl, newFilename, altText) {
+  const mimeType = detectMimeType(imageUrl);
+  const mediaGid = await getProductMediaGidByUrl(productGid, imageUrl);
+  if (!mediaGid) throw new Error('No se encontró el media de la imagen en el producto');
+  const imageData = await fetchImageBytes(imageUrl);
+  const staged = await graphqlRequest(`
+    mutation stagedUploadsCreate($input: [StagedUploadInput!]!) {
+      stagedUploadsCreate(input: $input) {
+        stagedTargets { url resourceUrl parameters { name value } }
+        userErrors { field message }
+      }
+    }
+  `, { input: [{ filename: newFilename, mimeType, resource: 'IMAGE', fileSize: String(imageData.length) }] });
+  const errs = staged?.data?.stagedUploadsCreate?.userErrors || [];
+  if (errs.length) throw new Error('Staged upload: ' + errs.map(e => e.message).join(', '));
+  const target = staged?.data?.stagedUploadsCreate?.stagedTargets?.[0];
+  if (!target) throw new Error('No se obtuvo staged target');
+  await uploadToStaged(target.url, target.parameters, imageData, mimeType, newFilename);
+  const createResult = await graphqlRequest(`
+    mutation productCreateMedia($productId: ID!, $media: [CreateMediaInput!]!) {
+      productCreateMedia(productId: $productId, media: $media) {
+        media { id status }
+        mediaUserErrors { field message }
+      }
+    }
+  `, { productId: productGid, media: [{ originalSource: target.resourceUrl, mediaContentType: 'IMAGE', alt: altText || '' }] });
+  const mediaErrs = createResult?.data?.productCreateMedia?.mediaUserErrors || [];
+  if (mediaErrs.length) throw new Error('Create media: ' + mediaErrs.map(e => e.message).join(', '));
+  const newMedia = createResult?.data?.productCreateMedia?.media?.[0];
+  if (!newMedia) throw new Error('No se creó el media');
+  for (let i = 0; i < 20; i++) {
+    await new Promise(r => setTimeout(r, 2000));
+    const check = await graphqlRequest(`{ product(id: ${JSON.stringify(productGid)}) { media(first: 50) { edges { node { id status } } } } }`);
+    const m = (check?.data?.product?.media?.edges || []).find(e => e.node.id === newMedia.id);
+    if (m?.node?.status === 'READY') break;
+    if (m?.node?.status === 'FAILED') throw new Error('La imagen falló al procesarse en Shopify');
+  }
+  await graphqlRequest(`
+    mutation productDeleteMedia($productId: ID!, $mediaIds: [ID!]!) {
+      productDeleteMedia(productId: $productId, mediaIds: $mediaIds) {
+        deletedMediaIds userErrors { field message }
+      }
+    }
+  `, { productId: productGid, mediaIds: [mediaGid] }).catch(e => console.warn('Delete media warn:', e.message));
+  return { mediaId: newMedia.id };
+}
+
 async function getImagesWithoutAlt(daysAgo = 90) {
   const since = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const images = [];
@@ -426,4 +534,5 @@ module.exports = {
   updateProductHandle, updateCollectionHandle, createRedirect,
   getProductsWithoutSEO,
   getImagesWithoutAlt,
+  renameAndUpdateImage,
 };
