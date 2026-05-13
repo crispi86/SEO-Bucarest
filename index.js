@@ -285,8 +285,14 @@ app.post('/api/webhook/products/create', (req, res) => res.status(200).send('ok'
 app.get('/api/products/pending', async (req, res) => {
   try {
     const days = parseInt(req.query.days) || 90;
-    const products = await shopify.getProductsWithoutSEO(days);
-    res.json(products);
+    res.json(await shopify.getProductsWithoutSEO(days));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/images/pending', async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 90;
+    res.json(await shopify.getImagesWithoutAlt(days));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -742,32 +748,69 @@ function adminUI(host) {
 <!-- PENDIENTES -->
 <div class="page" id="page-pending">
   <h1>Pendientes</h1>
-  <p class="subtitle">Productos recién agregados a Shopify que aún no tienen SEO generado.</p>
-  <div class="card">
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
-      <span id="pend-count" style="font-size:12px;color:#888"></span>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-primary" id="pend-gen-btn" onclick="generatePendingSEO()" disabled>Generar SEO</button>
-        <button class="btn" onclick="clearPending()" style="font-size:12px;color:#999;background:none;border:1px solid #ddd6cc">Limpiar lista</button>
+  <p class="subtitle">Contenido reciente sin optimización SEO.</p>
+  <div class="seo-filter" style="margin-bottom:16px">
+    <button class="seo-filter-btn active" id="pend-tab-btn-products" onclick="showPendingTab('products',this)">Productos sin SEO</button>
+    <button class="seo-filter-btn" id="pend-tab-btn-images" onclick="showPendingTab('images',this)">Imágenes sin alt text</button>
+  </div>
+
+  <!-- ── TAB PRODUCTOS ── -->
+  <div id="pend-tab-products">
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+        <span id="pend-count" style="font-size:12px;color:#888"></span>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary" id="pend-gen-btn" onclick="generatePendingSEO()" disabled>Generar SEO</button>
+          <button class="btn" onclick="clearPending()" style="font-size:12px;color:#999;background:none;border:1px solid #ddd6cc">Limpiar lista</button>
+        </div>
+      </div>
+      <div id="pend-list"><p class="empty-msg">Cargando…</p></div>
+      <div id="pend-prog" style="display:none;margin-top:14px">
+        <div style="height:4px;background:#eee;border-radius:2px"><div id="pend-pfill" style="height:4px;background:#9a7f5a;border-radius:2px;width:0;transition:width 0.3s"></div></div>
+        <div id="pend-plbl" style="font-size:11px;color:#888;margin-top:6px"></div>
       </div>
     </div>
-    <div id="pend-list"><p class="empty-msg">Cargando…</p></div>
-    <div id="pend-prog" style="display:none;margin-top:14px">
-      <div style="height:4px;background:#eee;border-radius:2px"><div id="pend-pfill" style="height:4px;background:#9a7f5a;border-radius:2px;width:0;transition:width 0.3s"></div></div>
-      <div id="pend-plbl" style="font-size:11px;color:#888;margin-top:6px"></div>
+    <div class="results-section" id="pend-results">
+      <h2>Propuestas generadas</h2>
+      <p class="subtitle" id="pend-rsub"></p>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+        <span id="pend-acount" style="font-size:13px;color:#666"></span>
+        <button class="btn btn-primary" id="pend-apply-btn" onclick="applyPendingSEO()" disabled>Aplicar todos</button>
+        <span id="pend-apply-msg" class="msg" style="display:none"></span>
+      </div>
+      <div class="results-wrap"><table class="rtbl"><thead><tr><th>Producto</th><th>Meta título actual</th><th style="min-width:200px">Meta título propuesto <span style="opacity:0.4;font-size:8px">≤60</span></th><th style="min-width:260px">Meta descripción propuesta <span style="opacity:0.4;font-size:8px">≤160</span></th><th>Acción</th></tr></thead><tbody id="pend-rtbody"></tbody></table></div>
     </div>
+    <div id="pend-msg"></div>
   </div>
-  <div class="results-section" id="pend-results">
-    <h2>Propuestas generadas</h2>
-    <p class="subtitle" id="pend-rsub"></p>
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-      <span id="pend-acount" style="font-size:13px;color:#666"></span>
-      <button class="btn btn-primary" id="pend-apply-btn" onclick="applyPendingSEO()" disabled>Aplicar todos</button>
-      <span id="pend-apply-msg" class="msg" style="display:none"></span>
+
+  <!-- ── TAB IMÁGENES ── -->
+  <div id="pend-tab-images" style="display:none">
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+        <span id="pend-img-count" style="font-size:12px;color:#888"></span>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary" id="pend-img-gen-btn" onclick="generatePendingImgAlt()" disabled>Generar alt text</button>
+          <button class="btn" onclick="clearPendingImages()" style="font-size:12px;color:#999;background:none;border:1px solid #ddd6cc">Limpiar lista</button>
+        </div>
+      </div>
+      <div id="pend-img-list"><p class="empty-msg">Cargando…</p></div>
+      <div id="pend-img-prog" style="display:none;margin-top:14px">
+        <div style="height:4px;background:#eee;border-radius:2px"><div id="pend-img-pfill" style="height:4px;background:#9a7f5a;border-radius:2px;width:0;transition:width 0.3s"></div></div>
+        <div id="pend-img-plbl" style="font-size:11px;color:#888;margin-top:6px"></div>
+      </div>
     </div>
-    <div class="results-wrap"><table class="rtbl"><thead><tr><th>Producto</th><th>Meta título actual</th><th style="min-width:200px">Meta título propuesto <span style="opacity:0.4;font-size:8px">≤60</span></th><th style="min-width:260px">Meta descripción propuesta <span style="opacity:0.4;font-size:8px">≤160</span></th><th>Acción</th></tr></thead><tbody id="pend-rtbody"></tbody></table></div>
+    <div class="results-section" id="pend-img-results">
+      <h2>Alt text propuesto</h2>
+      <p class="subtitle" id="pend-img-rsub"></p>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+        <span id="pend-img-acount" style="font-size:13px;color:#666"></span>
+        <button class="btn btn-primary" id="pend-img-apply-btn" onclick="applyPendingImgAlt()" disabled>Aplicar todos</button>
+        <span id="pend-img-apply-msg" class="msg" style="display:none"></span>
+      </div>
+      <div class="results-wrap"><table class="rtbl"><thead><tr><th>Imagen</th><th>Producto</th><th>Alt actual</th><th style="min-width:220px">Alt propuesto <span style="opacity:0.4;font-size:8px">≤120</span></th><th>Acción</th></tr></thead><tbody id="pend-img-rtbody"></tbody></table></div>
+    </div>
+    <div id="pend-img-msg"></div>
   </div>
-  <div id="pend-msg"></div>
 </div>
 
 <!-- CONFIGURACIÓN -->
@@ -1774,6 +1817,8 @@ function applyResearch() {
 // ── Pending ───────────────────────────────────────────────────────────────────
 let pendingItems = [];
 let pendingResults = [];
+let pendingImages = [];
+let pendingImgResults = [];
 
 async function loadPendingBadge() {
   try {
@@ -1781,6 +1826,14 @@ async function loadPendingBadge() {
     const badge = document.getElementById('pending-badge');
     if (badge) { badge.textContent = data.length; badge.style.display = data.length ? 'inline-block' : 'none'; }
   } catch(e) {}
+}
+
+function showPendingTab(tab, btn) {
+  ['products','images'].forEach(t => {
+    document.getElementById('pend-tab-'+t).style.display = t===tab ? 'block' : 'none';
+    document.getElementById('pend-tab-btn-'+t).classList.toggle('active', t===tab);
+  });
+  if (tab==='images' && !pendingImages.length) loadPendingImages();
 }
 
 async function loadPending() {
@@ -1792,6 +1845,16 @@ async function loadPending() {
     if (badge) { badge.textContent = pendingItems.length; badge.style.display = pendingItems.length ? 'inline-block' : 'none'; }
   } catch(e) {
     document.getElementById('pend-list').innerHTML='<p class="empty-msg">Error cargando pendientes.</p>';
+  }
+}
+
+async function loadPendingImages() {
+  document.getElementById('pend-img-list').innerHTML='<p class="empty-msg">Consultando Shopify…</p>';
+  try {
+    pendingImages = await fetch('/api/images/pending').then(r=>r.json());
+    renderPendingImagesTable();
+  } catch(e) {
+    document.getElementById('pend-img-list').innerHTML='<p class="empty-msg">Error cargando imágenes.</p>';
   }
 }
 
@@ -1948,6 +2011,130 @@ async function applyPendingSEO() {
     updatePendingApplyCount();
   } catch(e) { document.getElementById('pend-apply-msg').className='msg err'; document.getElementById('pend-apply-msg').textContent='Error: '+e.message; document.getElementById('pend-apply-msg').style.display='block'; }
   btn.textContent='Aplicar en Shopify'; btn.disabled=false;
+}
+
+// ── Pending Images ─────────────────────────────────────────────────────────────
+function renderPendingImagesTable() {
+  const list = document.getElementById('pend-img-list');
+  const countEl = document.getElementById('pend-img-count');
+  const genBtn = document.getElementById('pend-img-gen-btn');
+  if (!pendingImages.length) {
+    list.innerHTML='<p class="empty-msg">No hay imágenes sin alt text en los últimos 90 días.</p>';
+    if (countEl) countEl.textContent='';
+    if (genBtn) genBtn.disabled=true;
+    return;
+  }
+  if (countEl) countEl.textContent = pendingImages.length+' imagen(es) sin alt text';
+  if (genBtn) genBtn.disabled=false;
+  list.innerHTML=\`<table class="tbl"><thead><tr><th style="width:30px"></th><th style="width:60px">Imagen</th><th>Producto</th><th style="width:32px"></th></tr></thead><tbody>
+    \${pendingImages.map((img,i)=>\`<tr onclick="togglePendingImgRow(\${i})">
+      <td><input type="checkbox" name="pend_img_item" value="\${img.id}" data-idx="\${i}" checked onchange="updatePendingImgCount();event.stopPropagation()"></td>
+      <td><img src="\${esc(img.url)}" style="width:50px;height:50px;object-fit:cover;border:1px solid #eee"></td>
+      <td>\${esc(img.productTitle)}</td>
+      <td><button onclick="dismissPendingImage(\${i});event.stopPropagation()" style="background:none;border:none;color:#bbb;cursor:pointer;font-size:14px;padding:2px 4px" title="Ignorar">✕</button></td>
+    </tr>\`).join('')}
+  </tbody></table>\`;
+  updatePendingImgCount();
+}
+
+function togglePendingImgRow(idx) {
+  const cb = document.querySelector('[name="pend_img_item"][data-idx="'+idx+'"]');
+  if (cb) { cb.checked=!cb.checked; updatePendingImgCount(); }
+}
+
+function updatePendingImgCount() {
+  const n = document.querySelectorAll('[name="pend_img_item"]:checked').length;
+  const genBtn = document.getElementById('pend-img-gen-btn');
+  if (genBtn) genBtn.disabled = !n;
+}
+
+function dismissPendingImage(idx) {
+  pendingImages.splice(idx, 1);
+  renderPendingImagesTable();
+}
+
+function clearPendingImages() {
+  if (!confirm('¿Limpiar la lista? Se recargará desde Shopify la próxima vez.')) return;
+  pendingImages=[];
+  renderPendingImagesTable();
+}
+
+async function generatePendingImgAlt() {
+  const checked = Array.from(document.querySelectorAll('[name="pend_img_item"]:checked'));
+  const items = checked.map(cb => pendingImages[parseInt(cb.dataset.idx)]).filter(Boolean);
+  if (!items.length) return;
+  pendingImgResults=[];
+  document.getElementById('pend-img-rtbody').innerHTML='';
+  document.getElementById('pend-img-results').style.display='none';
+  document.getElementById('pend-img-prog').style.display='block';
+  document.getElementById('pend-img-gen-btn').disabled=true;
+  const total=items.length;
+  const {jobId} = await fetch('/api/seo/queue',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'images',items})}).then(r=>r.json());
+  const es=new EventSource('/api/seo/stream/'+jobId);
+  es.onmessage=e=>{
+    const data=JSON.parse(e.data);
+    if(data.done){es.close();document.getElementById('pend-img-prog').style.display='none';document.getElementById('pend-img-gen-btn').disabled=false;if(pendingImgResults.length){const sec=document.getElementById('pend-img-results');sec.style.display='block';document.getElementById('pend-img-rsub').textContent=pendingImgResults.length+' propuesta(s). Revisa y edita antes de aplicar.';updatePendingImgApplyCount();sec.scrollIntoView({behavior:'smooth',block:'start'});}return;}
+    document.getElementById('pend-img-pfill').style.width=Math.round(data.index/total*100)+'%';
+    document.getElementById('pend-img-plbl').textContent='Procesando '+data.index+' de '+total+'…';
+    if(!data.error){pendingImgResults.push({...data,approved:true});appendPendingImgResult(data,pendingImgResults.length-1);}
+    else{const tr=document.createElement('tr');tr.innerHTML=\`<td colspan="5" style="color:#c0392b;font-size:11px;padding:8px 12px">Error en "\${esc(data.itemTitle||data.productTitle||'?')}": \${esc(data.error)}</td>\`;document.getElementById('pend-img-rtbody').appendChild(tr);}
+    updatePendingImgApplyCount();
+  };
+  es.onerror=()=>{es.close();document.getElementById('pend-img-prog').style.display='none';document.getElementById('pend-img-gen-btn').disabled=false;if(pendingImgResults.length){document.getElementById('pend-img-results').style.display='block';updatePendingImgApplyCount();}};
+}
+
+function appendPendingImgResult(data, idx) {
+  const tbody=document.getElementById('pend-img-rtbody');
+  const tr=document.createElement('tr'); tr.id='pend-img-rr-'+idx;
+  tr.innerHTML=\`
+    <td><img src="\${esc(data.url||'')}" style="width:50px;height:50px;object-fit:cover;border:1px solid #eee"></td>
+    <td class="td-name">\${esc(data.productTitle)}</td>
+    <td class="td-cur">\${esc(data.currentAlt||'(vacío)')}</td>
+    <td><input class="seo-inp" type="text" maxlength="125" value="\${esc(data.altText)}" oninput="charCount(this,120,'pend-img-ca-\${idx}')" id="pend-img-ai-\${idx}"><div class="char-c" id="pend-img-ca-\${idx}"></div></td>
+    <td class="td-act"><button class="btn-ap on" id="pend-img-ba-\${idx}" onclick="applyOnePendingImg(\${idx},this)">Aplicar</button></td>
+  \`;
+  tbody.appendChild(tr);
+  const ai=document.getElementById('pend-img-ai-'+idx); if(ai) charCount(ai,120,'pend-img-ca-'+idx);
+}
+
+function updatePendingImgApplyCount() {
+  const n=pendingImgResults.filter(r=>r.approved).length;
+  const el=document.getElementById('pend-img-acount'); if(el) el.textContent=n+' aprobada(s)';
+  const btn=document.getElementById('pend-img-apply-btn'); if(btn) btn.disabled=!n;
+}
+
+async function applyOnePendingImg(idx, btn) {
+  const r=pendingImgResults[idx]; if(!r) return;
+  const altText=(document.getElementById('pend-img-ai-'+idx)?.value||r.altText).trim();
+  const item={...r, altText};
+  btn.disabled=true; btn.textContent='Guardando…';
+  try {
+    const res=await fetch('/api/seo/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'images',items:[item]})}).then(r=>r.json());
+    if(res.errors?.length){btn.textContent='Error';btn.classList.add('btn-rj');btn.classList.remove('btn-ap','on');btn.disabled=false;return;}
+    btn.textContent='✓ Aplicado'; btn.disabled=true;
+    res.applied.forEach(a=>{pendingImages=pendingImages.filter(img=>img.id!==a.id);});
+    renderPendingImagesTable();
+  } catch(e){btn.textContent='Error';btn.disabled=false;}
+}
+
+async function applyPendingImgAlt() {
+  const toApply=pendingImgResults
+    .map((r,idx)=>r.approved?{...r,altText:(document.getElementById('pend-img-ai-'+idx)?.value||r.altText).trim()}:null)
+    .filter(Boolean);
+  if(!toApply.length) return;
+  const btn=document.getElementById('pend-img-apply-btn'); btn.disabled=true; btn.textContent='Aplicando…';
+  try {
+    const res=await fetch('/api/seo/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'images',items:toApply})}).then(r=>r.json());
+    const msgEl=document.getElementById('pend-img-apply-msg');
+    msgEl.className='msg '+(res.errors.length?'err':'ok');
+    msgEl.textContent=res.applied.length+' actualizada(s).'+(res.errors.length?' '+res.errors.length+' error(es).':'');
+    msgEl.style.display='block';
+    res.applied.forEach(a=>{pendingImages=pendingImages.filter(img=>img.id!==a.id);});
+    renderPendingImagesTable();
+    pendingImgResults=pendingImgResults.filter(r=>!res.applied.find(a=>a.id===r.imageId));
+    updatePendingImgApplyCount();
+  } catch(e){document.getElementById('pend-img-apply-msg').className='msg err';document.getElementById('pend-img-apply-msg').textContent='Error: '+e.message;document.getElementById('pend-img-apply-msg').style.display='block';}
+  btn.textContent='Aplicar todos'; btn.disabled=false;
 }
 
 init();

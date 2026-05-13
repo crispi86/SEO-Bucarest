@@ -386,6 +386,24 @@ async function createRedirect(path, target) {
   return true;
 }
 
+async function getImagesWithoutAlt(daysAgo = 90) {
+  const since = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const images = [];
+  let cursor = null;
+  do {
+    const result = await getProductsWithImages(null, `created_at:>=${since}`, 50, cursor);
+    for (const product of result.products) {
+      for (const img of product.images) {
+        if (!img.currentAlt) {
+          images.push({ ...img, productId: product.id, productGid: product.gid, productTitle: product.title, vendor: product.vendor, productType: product.productType });
+        }
+      }
+    }
+    cursor = result.pageInfo?.hasNextPage ? result.pageInfo.endCursor : null;
+  } while (cursor);
+  return images;
+}
+
 async function getProductsWithoutSEO(daysAgo = 90) {
   const since = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   let all = [];
@@ -407,4 +425,5 @@ module.exports = {
   getProductsWithImages, updateImageAlt,
   updateProductHandle, updateCollectionHandle, createRedirect,
   getProductsWithoutSEO,
+  getImagesWithoutAlt,
 };
