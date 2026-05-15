@@ -289,6 +289,20 @@ app.get('/api/products/pending', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+app.get('/api/collections/pending', async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 90;
+    res.json(await shopify.getCollectionsWithoutSEO(days));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/articles/pending', async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 90;
+    res.json(await shopify.getArticlesWithoutSEO(days));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/images/pending', async (req, res) => {
   try {
     const days = parseInt(req.query.days) || 90;
@@ -517,7 +531,7 @@ function adminUI(host) {
       <button class="filter-btn active" onclick="setPF('collection',this)">Por colección</button>
       <button class="filter-btn" onclick="setPF('tag',this)">Por tag</button>
       <button class="filter-btn" onclick="setPF('title',this)">Por título</button>
-      <button class="filter-btn" onclick="setPF('pending',this)" style="border-color:#c0392b;color:#c0392b">Sin SEO recientes</button>
+      <button class="filter-btn" id="btn-pend-products" onclick="setPF('pending',this)" style="border-color:#c0392b;color:#c0392b">Pendientes <span id="pend-count-products" style="background:#c0392b;color:#fff;border-radius:8px;padding:1px 6px;font-size:9px;font-weight:bold;margin-left:3px">…</span></button>
       <span style="color:#e8e2d9;margin:0 4px;align-self:center">|</span>
       <div id="p-seo-filter-top" style="display:flex;gap:6px;align-items:center">
         <button class="seo-filter-btn active" data-f="all" onclick="setPSeoFilter('all',this)">Todos</button>
@@ -612,7 +626,10 @@ function adminUI(host) {
   <h1>Colecciones</h1>
   <p class="subtitle">Optimiza metatítulo y metadescripción de tus colecciones.</p>
   <div class="card">
-    <button class="btn btn-secondary" onclick="loadCollectionsSEO()" style="margin-bottom:14px">Cargar colecciones</button>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+      <button class="btn btn-secondary" onclick="loadCollectionsSEO()">Cargar colecciones</button>
+      <button id="btn-pend-collections" onclick="loadPendingCollections()" style="border:1px solid #c0392b;color:#c0392b;background:none;padding:7px 14px;cursor:pointer;font-size:12px;font-family:inherit;border-radius:4px">Pendientes <span id="pend-count-collections" style="background:#c0392b;color:#fff;border-radius:8px;padding:1px 6px;font-size:9px;font-weight:bold;margin-left:3px">…</span></button>
+    </div>
     <div id="c-loading" class="empty-msg" style="display:none">Cargando…</div>
     <div id="c-meta-filter" style="display:none;margin:10px 0 4px;padding-top:10px;border-top:1px solid #f0ece6">
       <div style="font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:#aaa;margin-bottom:6px">Meta SEO</div>
@@ -679,6 +696,7 @@ function adminUI(host) {
     <div style="display:flex;gap:10px;margin-bottom:14px">
       <input id="art-search" placeholder="Buscar por título…" oninput="debounce(loadArticles,600)" style="flex:1">
       <button class="btn btn-secondary" onclick="loadArticles()" style="white-space:nowrap;padding:9px 16px">Cargar todos</button>
+      <button id="btn-pend-articles" onclick="loadPendingArticles()" style="border:1px solid #c0392b;color:#c0392b;background:none;padding:9px 14px;cursor:pointer;font-size:12px;font-family:inherit;border-radius:4px;white-space:nowrap">Pendientes <span id="pend-count-articles" style="background:#c0392b;color:#fff;border-radius:8px;padding:1px 6px;font-size:9px;font-weight:bold;margin-left:3px">…</span></button>
     </div>
     <div id="art-loading" class="empty-msg" style="display:none">Cargando…</div>
     <div id="art-meta-filter" style="display:none;margin:10px 0 4px;padding-top:10px;border-top:1px solid #f0ece6">
@@ -720,7 +738,7 @@ function adminUI(host) {
       <button class="filter-btn active" onclick="setImgF('collection',this)">Por colección</button>
       <button class="filter-btn" onclick="setImgF('tag',this)">Por tag</button>
       <button class="filter-btn" onclick="setImgF('title',this)">Por título</button>
-      <button class="filter-btn" onclick="setImgF('pending',this)" style="border-color:#c0392b;color:#c0392b">Sin alt recientes</button>
+      <button class="filter-btn" id="btn-pend-images" onclick="setImgF('pending',this)" style="border-color:#c0392b;color:#c0392b">Pendientes <span id="pend-count-images" style="background:#c0392b;color:#fff;border-radius:8px;padding:1px 6px;font-size:9px;font-weight:bold;margin-left:3px">…</span></button>
       <span style="color:#e8e2d9;margin:0 4px;align-self:center">|</span>
       <div id="img-seo-filter-top" style="display:flex;gap:6px;align-items:center">
         <button class="seo-filter-btn active" data-f="all" onclick="setSeoFilter('images','all',this)">Todos</button>
@@ -752,7 +770,7 @@ function adminUI(host) {
     <div class="progress-wrap" id="img-prog"><div class="progress-bar"><div class="progress-fill" id="img-pfill"></div></div><div class="progress-lbl" id="img-plbl"></div></div>
     <div class="results-section" id="img-results">
       <h2>Alt text propuesto</h2><p class="results-subtitle" id="img-rsub"></p>
-      <div class="results-wrap"><table class="rtbl"><thead><tr><th>Imagen</th><th>Producto</th><th>Alt actual</th><th style="min-width:220px">Alt propuesto <span style="opacity:0.4;font-size:8px">≤120</span></th><th>Acción</th></tr></thead><tbody id="img-rtbody"></tbody></table></div>
+      <div class="results-wrap"><table class="rtbl"><thead><tr><th>Imagen</th><th>Producto</th><th>Alt actual</th><th style="min-width:220px">Alt propuesto <span style="opacity:0.4;font-size:8px">≤120</span></th><th style="min-width:160px">Nombre archivo <span style="opacity:0.4;font-size:8px">SEO</span></th><th>Acción</th></tr></thead><tbody id="img-rtbody"></tbody></table></div>
       <div class="apply-bar"><span class="apply-count" id="img-acount">0 aprobadas</span><button class="btn btn-primary" id="img-apply-btn" onclick="applyAll('images')" disabled>Aplicar todos</button><div id="img-apply-msg"></div></div>
     </div>
     <div id="img-msg"></div>
@@ -886,6 +904,41 @@ async function init() {
     const sel = document.getElementById(id);
     cols.forEach(c => { const o = document.createElement('option'); o.value=c.id; o.textContent=c.title; sel.appendChild(o); });
   });
+  loadAllPendingCounts();
+}
+
+function setPendingCount(id, n) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = n;
+}
+
+async function loadAllPendingCounts() {
+  try { const d=await fetch('/api/products/pending').then(r=>r.json()); setPendingCount('pend-count-products', d.length); } catch{}
+  try { const d=await fetch('/api/collections/pending').then(r=>r.json()); setPendingCount('pend-count-collections', d.length); } catch{}
+  try { const d=await fetch('/api/articles/pending').then(r=>r.json()); setPendingCount('pend-count-articles', d.length); } catch{}
+  try { const d=await fetch('/api/images/pending').then(r=>r.json()); setPendingCount('pend-count-images', d.length); } catch{}
+}
+
+async function loadPendingCollections() {
+  const load=document.getElementById('c-loading'); load.style.display='block'; document.getElementById('c-list').innerHTML=''; sections.collections.items=[];
+  try {
+    const d = await fetch('/api/collections/pending').then(r=>r.json());
+    sections.collections.items = d;
+    load.style.display='none';
+    renderCollTable();
+    if (!d.length) document.getElementById('c-list').innerHTML='<p class="empty-msg">No hay colecciones recientes sin SEO.</p>';
+  } catch(e) { load.style.display='none'; document.getElementById('c-list').innerHTML='<p class="empty-msg">Error cargando.</p>'; }
+}
+
+async function loadPendingArticles() {
+  const load=document.getElementById('art-loading'); load.style.display='block'; document.getElementById('art-list').innerHTML=''; sections.articles.items=[];
+  try {
+    const d = await fetch('/api/articles/pending').then(r=>r.json());
+    sections.articles.items = d;
+    load.style.display='none';
+    renderArtTable();
+    if (!d.length) document.getElementById('art-list').innerHTML='<p class="empty-msg">No hay artículos recientes sin SEO.</p>';
+  } catch(e) { load.style.display='none'; document.getElementById('art-list').innerHTML='<p class="empty-msg">Error cargando.</p>'; }
 }
 
 // ── Navigation ────────────────────────────────────────────────────────────────
@@ -1397,11 +1450,15 @@ function appendResult(type, data, idx) {
   const tr=document.createElement('tr'); tr.id=prefix+'-rr-'+idx;
 
   if (type === 'images') {
+    const ext = pendingImgSlug(data.url||'');
+    const initSlug = generateSlug(data.altText||'');
+    const initFilename = initSlug ? initSlug+'.'+ext : '';
     tr.innerHTML=\`
       <td><img src="\${esc(data.url)}" class="thumb"></td>
       <td class="td-name">\${esc(data.productTitle)}</td>
       <td class="td-cur">\${esc(data.currentAlt||'(sin alt)')}</td>
-      <td><input class="seo-inp" type="text" maxlength="125" value="\${esc(data.altText)}" oninput="charCount(this,120,'\${prefix}-cc-\${idx}')" id="\${prefix}-ai-\${idx}"><div class="char-c" id="\${prefix}-cc-\${idx}"></div></td>
+      <td><input class="seo-inp" type="text" maxlength="125" value="\${esc(data.altText)}" oninput="charCount(this,120,'\${prefix}-cc-\${idx}');syncImgFilename('\${prefix}',\${idx})" id="\${prefix}-ai-\${idx}"><div class="char-c" id="\${prefix}-cc-\${idx}"></div></td>
+      <td><input class="seo-inp" type="text" placeholder="nombre-archivo.jpg" value="\${esc(initFilename)}" data-ext="\${ext}" oninput="this.dataset.userEdited='1'" id="\${prefix}-fn-\${idx}" style="font-size:11px"></td>
       <td class="td-act"><button class="btn-ap on" id="\${prefix}-ba-\${idx}" onclick="applyOne('\${type}',\${idx},this)">Aplicar</button></td>
     \`;
     tbody.appendChild(tr);
@@ -1423,18 +1480,49 @@ function appendResult(type, data, idx) {
 function appendErrResult(prefix, data) {
   const tbody=document.getElementById(prefix+'-rtbody');
   const tr=document.createElement('tr');
-  tr.innerHTML=\`<td colspan="5" style="color:#c0392b;font-size:11px;padding:8px 12px">Error en "\${esc(data.itemTitle||'?')}": \${esc(data.error)}</td>\`;
+  tr.innerHTML=\`<td colspan="6" style="color:#c0392b;font-size:11px;padding:8px 12px">Error en "\${esc(data.itemTitle||'?')}": \${esc(data.error)}</td>\`;
   tbody.appendChild(tr);
+}
+
+function syncImgFilename(prefix, idx) {
+  const ai=document.getElementById(prefix+'-ai-'+idx);
+  const fn=document.getElementById(prefix+'-fn-'+idx);
+  if (!ai||!fn||fn.dataset.userEdited) return;
+  const ext=fn.dataset.ext||'jpg';
+  const slug=generateSlug(ai.value);
+  fn.value=slug?slug+'.'+ext:'';
 }
 
 async function applyOne(type, idx, btn) {
   const prefix=typeMap[type];
   const r=sections[type].results[idx];
   if (!r) return;
-  let item;
-  if (type==='images') item={...r, altText:(document.getElementById(prefix+'-ai-'+idx)?.value||r.altText).trim()};
-  else item={...r, metaTitle:(document.getElementById(prefix+'-ti-'+idx)?.value||r.metaTitle).trim(), metaDescription:(document.getElementById(prefix+'-di-'+idx)?.value||r.metaDescription).trim()};
-  btn.disabled=true; btn.textContent='Guardando…';
+  btn.disabled=true;
+  if (type==='images') {
+    const altText=(document.getElementById(prefix+'-ai-'+idx)?.value||r.altText).trim();
+    const newFilename=(document.getElementById(prefix+'-fn-'+idx)?.value||'').trim();
+    const currentFilename=(r.url||'').split('?')[0].split('/').pop();
+    if (newFilename && newFilename!==currentFilename) {
+      btn.textContent='Renombrando…';
+      try {
+        const res=await fetch('/api/image/rename',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({productGid:r.productGid,imageUrl:r.url,newFilename,altText})}).then(x=>x.json());
+        if(res.error){btn.textContent='Error: '+res.error.slice(0,40);btn.classList.add('btn-rj');btn.classList.remove('btn-ap','on');btn.disabled=false;return;}
+      } catch(e){btn.textContent='Error';btn.disabled=false;return;}
+    } else {
+      btn.textContent='Guardando…';
+      try {
+        const res=await fetch('/api/seo/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,items:[{...r,altText}]})}).then(x=>x.json());
+        if(res.errors?.length){btn.textContent='Error';btn.classList.add('btn-rj');btn.classList.remove('btn-ap','on');btn.disabled=false;return;}
+      } catch(e){btn.textContent='Error';btn.disabled=false;return;}
+    }
+    btn.textContent='✓ Aplicado'; btn.classList.add('on'); btn.disabled=true;
+    const it=sections[type].items.find(x=>x.id===r.imageId||x.id===r.id);
+    if(it) it.currentAlt=altText;
+    updateApplyCount(prefix, sections[type].results);
+    return;
+  }
+  const item={...r, metaTitle:(document.getElementById(prefix+'-ti-'+idx)?.value||r.metaTitle).trim(), metaDescription:(document.getElementById(prefix+'-di-'+idx)?.value||r.metaDescription).trim()};
+  btn.textContent='Guardando…';
   try {
     const res=await fetch('/api/seo/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,items:[item]})}).then(r=>r.json());
     if (res.errors?.length) { btn.textContent='Error'; btn.classList.add('btn-rj'); btn.classList.remove('btn-ap','on'); btn.disabled=false; return; }
@@ -1453,31 +1541,66 @@ async function applyOne(type, idx, btn) {
 // ── Apply all ─────────────────────────────────────────────────────────────────
 async function applyAll(type) {
   const prefix=typeMap[type];
-  const toApply = sections[type].results
-    .map((r,idx) => {
-      const btn=document.getElementById(prefix+'-ba-'+idx);
-      if (btn?.disabled && btn.textContent==='✓ Aplicado') return null;
-      if (type==='images') return {...r, altText:(document.getElementById(prefix+'-ai-'+idx)?.value||r.altText).trim()};
-      return {...r, metaTitle:(document.getElementById(prefix+'-ti-'+idx)?.value||r.metaTitle).trim(), metaDescription:(document.getElementById(prefix+'-di-'+idx)?.value||r.metaDescription).trim()};
-    })
-    .filter(Boolean);
-  if (!toApply.length) return;
   const applyBtn=document.getElementById(prefix+'-apply-btn'); applyBtn.disabled=true; applyBtn.textContent='Aplicando…';
+  const msgEl=document.getElementById(prefix+'-apply-msg');
+
+  if (type==='images') {
+    const toApply=sections[type].results.map((r,idx)=>{
+      const btn=document.getElementById(prefix+'-ba-'+idx);
+      if(btn?.disabled&&btn.textContent==='✓ Aplicado') return null;
+      const altText=(document.getElementById(prefix+'-ai-'+idx)?.value||r.altText).trim();
+      const newFilename=(document.getElementById(prefix+'-fn-'+idx)?.value||'').trim();
+      const currentFilename=(r.url||'').split('?')[0].split('/').pop();
+      const needsRename=newFilename&&newFilename!==currentFilename;
+      return {...r,altText,newFilename:needsRename?newFilename:null,_idx:idx};
+    }).filter(Boolean);
+    if(!toApply.length){applyBtn.textContent='Aplicar todos';applyBtn.disabled=false;return;}
+    const toRename=toApply.filter(r=>r.newFilename);
+    const toAltOnly=toApply.filter(r=>!r.newFilename);
+    let ok=0,errors=0;
+    for(let i=0;i<toRename.length;i++){
+      const r=toRename[i]; applyBtn.textContent=\`Renombrando \${i+1}/\${toRename.length}…\`;
+      try{
+        const res=await fetch('/api/image/rename',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({productGid:r.productGid,imageUrl:r.url,newFilename:r.newFilename,altText:r.altText})}).then(x=>x.json());
+        if(res.error) errors++;
+        else{ok++;const b=document.getElementById(prefix+'-ba-'+r._idx);if(b){b.textContent='✓ Aplicado';b.disabled=true;}}
+      }catch{errors++;}
+    }
+    if(toAltOnly.length){
+      applyBtn.textContent='Guardando alt…';
+      try{
+        const res=await fetch('/api/seo/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,items:toAltOnly})}).then(r=>r.json());
+        ok+=res.applied.length; errors+=res.errors.length;
+        res.applied.forEach(a=>{const i=sections[type].results.findIndex(r=>r.imageId===a.id||r.id===a.id);if(i>=0){const b=document.getElementById(prefix+'-ba-'+i);if(b){b.textContent='✓ Aplicado';b.disabled=true;}}});
+      }catch{errors+=toAltOnly.length;}
+    }
+    msgEl.className='msg '+(errors?'err':'ok');
+    msgEl.textContent=ok+' actualizado(s).'+(errors?' '+errors+' error(es).':'');
+    msgEl.style.display='block';
+    applyBtn.textContent='Aplicar todos'; applyBtn.disabled=false;
+    return;
+  }
+
+  const toApply=sections[type].results.map((r,idx)=>{
+    const btn=document.getElementById(prefix+'-ba-'+idx);
+    if(btn?.disabled&&btn.textContent==='✓ Aplicado') return null;
+    return {...r,metaTitle:(document.getElementById(prefix+'-ti-'+idx)?.value||r.metaTitle).trim(),metaDescription:(document.getElementById(prefix+'-di-'+idx)?.value||r.metaDescription).trim()};
+  }).filter(Boolean);
+  if(!toApply.length){applyBtn.textContent='Aplicar todos';applyBtn.disabled=false;return;}
   try {
     const res=await fetch('/api/seo/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,items:toApply})}).then(r=>r.json());
-    const msgEl=document.getElementById(prefix+'-apply-msg');
     msgEl.className='msg '+(res.errors.length?'err':'ok');
     msgEl.textContent=res.applied.length+' actualizado(s) en Shopify.'+(res.errors.length?' '+res.errors.length+' error(es).':'');
     msgEl.style.display='block';
     res.applied.forEach(a => {
-      const arr = sections[type].items;
-      const it = arr.find(x => x.id === a.id || x.gid === a.id);
-      if (it) { it.currentMetaTitle = a.metaTitle||it.currentMetaTitle; it.currentMetaDescription = a.metaDescription||it.currentMetaDescription; }
+      const arr=sections[type].items;
+      const it=arr.find(x=>x.id===a.id||x.gid===a.id);
+      if(it){it.currentMetaTitle=a.metaTitle||it.currentMetaTitle;it.currentMetaDescription=a.metaDescription||it.currentMetaDescription;}
       const i=sections[type].results.findIndex(r=>r.productId===a.id||r.collectionId===a.id||r.metaobjectId===a.id||r.articleId===a.id||r.imageId===a.id);
       if(i>=0){const b=document.getElementById(prefix+'-ba-'+i);if(b){b.textContent='✓ Aplicado';b.disabled=true;}}
     });
-    if (type==='products') renderProductTable(sections.products.items);
-    else if (type==='collections') renderCollTable();
+    if(type==='products') renderProductTable(sections.products.items);
+    else if(type==='collections') renderCollTable();
   } catch(e) { showSectionMsg(prefix,'Error al aplicar: '+e.message,'err'); }
   applyBtn.textContent='Aplicar todos'; applyBtn.disabled=false;
 }
@@ -1889,12 +2012,7 @@ function pendingImgSlug(url) {
 }
 
 function syncPendingImgFilename(idx) {
-  const altInp = document.getElementById('pend-img-ai-'+idx);
-  const fnInp  = document.getElementById('pend-img-fn-'+idx);
-  if (!altInp || !fnInp || fnInp.dataset.userEdited) return;
-  const ext = fnInp.dataset.ext || 'jpg';
-  const slug = generateSlug(altInp.value);
-  fnInp.value = slug ? slug+'.'+ext : '';
+  syncImgFilename('pend-img', idx);
 }
 
 function appendPendingImgResult(data, idx) {

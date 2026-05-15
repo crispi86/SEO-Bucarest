@@ -524,6 +524,57 @@ async function getProductsWithoutSEO(daysAgo = 90) {
   return all.sort((a, b) => b.id.localeCompare(a.id));
 }
 
+async function getCollectionsWithoutSEO(daysAgo = 90) {
+  const since = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const result = await graphqlRequest(`{
+    collections(first: 250, query: "created_at:>=${since}") {
+      edges {
+        node {
+          id handle title descriptionHtml
+          seo { title description }
+        }
+      }
+    }
+  }`);
+  return (result?.data?.collections?.edges || [])
+    .map(e => ({
+      id: e.node.id.replace('gid://shopify/Collection/', ''),
+      gid: e.node.id,
+      handle: e.node.handle || '',
+      title: e.node.title,
+      description: (e.node.descriptionHtml || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().substring(0, 400),
+      currentMetaTitle: e.node.seo?.title || '',
+      currentMetaDescription: e.node.seo?.description || '',
+    }))
+    .filter(c => !c.currentMetaTitle);
+}
+
+async function getArticlesWithoutSEO(daysAgo = 90) {
+  const since = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const result = await graphqlRequest(`{
+    articles(first: 250, query: "created_at:>=${since}") {
+      edges {
+        node {
+          id handle title
+          blog { title }
+          seo { title description }
+        }
+      }
+    }
+  }`);
+  return (result?.data?.articles?.edges || [])
+    .map(e => ({
+      id: e.node.id.replace('gid://shopify/Article/', ''),
+      gid: e.node.id,
+      handle: e.node.handle || '',
+      title: e.node.title,
+      blogTitle: e.node.blog?.title || '',
+      currentMetaTitle: e.node.seo?.title || '',
+      currentMetaDescription: e.node.seo?.description || '',
+    }))
+    .filter(a => !a.currentMetaTitle);
+}
+
 module.exports = {
   graphqlRequest,
   getProductsByCollection, getProductsByQuery, updateProductSEO,
@@ -533,6 +584,8 @@ module.exports = {
   getProductsWithImages, updateImageAlt,
   updateProductHandle, updateCollectionHandle, createRedirect,
   getProductsWithoutSEO,
+  getCollectionsWithoutSEO,
+  getArticlesWithoutSEO,
   getImagesWithoutAlt,
   renameAndUpdateImage,
 };
