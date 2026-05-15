@@ -773,6 +773,7 @@ function adminUI(host) {
     </div>
     <div class="btn-row">
       <button class="btn btn-primary" id="img-gen-btn" onclick="startGen('images')" disabled>Generar alt text con Claude</button>
+      <button class="btn btn-secondary" id="img-rename-btn" onclick="startRename()" disabled>Renombrar archivos</button>
       <span class="btn-hint" id="img-hint">Seleccione imágenes</span>
     </div>
     <div class="progress-wrap" id="img-prog"><div class="progress-bar"><div class="progress-fill" id="img-pfill"></div></div><div class="progress-lbl" id="img-plbl"></div></div>
@@ -780,6 +781,12 @@ function adminUI(host) {
       <h2>Alt text propuesto</h2><p class="results-subtitle" id="img-rsub"></p>
       <div class="results-wrap"><table class="rtbl"><thead><tr><th>Imagen</th><th>Producto</th><th>Alt actual</th><th style="min-width:220px">Alt propuesto <span style="opacity:0.4;font-size:8px">≤120</span></th><th style="min-width:160px">Nombre archivo <span style="opacity:0.4;font-size:8px">SEO</span></th><th>Acción</th></tr></thead><tbody id="img-rtbody"></tbody></table></div>
       <div class="apply-bar"><span class="apply-count" id="img-acount">0 aprobadas</span><button class="btn btn-primary" id="img-apply-btn" onclick="applyAll('images')" disabled>Aplicar todos</button><div id="img-apply-msg"></div></div>
+    </div>
+    <div class="results-section" id="img-rename-results" style="display:none">
+      <h2>Renombrar archivos</h2>
+      <p class="results-subtitle">Nombre sugerido desde el alt actual o el título del producto. Edita antes de aplicar.</p>
+      <div class="results-wrap"><table class="rtbl"><thead><tr><th>Imagen</th><th>Producto</th><th>Alt actual</th><th>Nombre actual</th><th style="min-width:200px">Nombre nuevo <span style="opacity:0.4;font-size:8px">SEO</span></th><th>Acción</th></tr></thead><tbody id="img-rename-tbody"></tbody></table></div>
+      <div class="apply-bar"><button class="btn btn-primary" id="img-rename-apply-btn" onclick="applyAllRenames()">Aplicar todos</button><div id="img-rename-msg"></div></div>
     </div>
     <div id="img-msg"></div>
   </div>
@@ -1020,9 +1027,11 @@ function afterSelChange(prefix) {
   const n = updateSelCount(prefix);
   const genBtn = document.getElementById(prefix+'-gen-btn');
   const urlBtn = document.getElementById(prefix+'-url-btn');
+  const renameBtn = document.getElementById(prefix+'-rename-btn');
   const hint = document.getElementById(prefix+'-hint');
   if (genBtn) { genBtn.disabled = !n; if(hint) hint.textContent = n ? n+' elemento(s) listo(s)' : 'Seleccione elementos'; }
   if (urlBtn) urlBtn.disabled = !n;
+  if (renameBtn) renameBtn.disabled = !n;
 }
 
 function showSectionMsg(prefix, text, type) {
@@ -1629,6 +1638,79 @@ async function applyAll(type) {
     if(type==='products') renderProductTable(sections.products.items);
     else if(type==='collections') renderCollTable();
   } catch(e) { showSectionMsg(prefix,'Error al aplicar: '+e.message,'err'); }
+  applyBtn.textContent='Aplicar todos'; applyBtn.disabled=false;
+}
+
+// ── Image Rename (direct, no Claude) ──────────────────────────────────────────
+let renameItems = [];
+
+function startRename() {
+  const checkboxes = Array.from(document.querySelectorAll('[name="img_item"]:checked'));
+  if (!checkboxes.length) return;
+  renameItems = checkboxes.map(cb => JSON.parse(cb.dataset.obj));
+  const tbody = document.getElementById('img-rename-tbody');
+  tbody.innerHTML = '';
+  renameItems.forEach((img, idx) => {
+    const currentFilename = (img.url||'').split('?')[0].split('/').pop();
+    const ext = currentFilename.split('.').pop().toLowerCase() || 'jpg';
+    const source = img.currentAlt || img.productTitle || '';
+    const suggestedSlug = generateSlug(source);
+    const suggested = suggestedSlug ? suggestedSlug+'.'+ext : currentFilename;
+    const tr = document.createElement('tr');
+    tr.innerHTML = \`
+      <td><img src="\${esc(img.url)}" class="thumb"></td>
+      <td class="td-name">\${esc(img.productTitle)}</td>
+      <td style="font-size:11px;color:#666;max-width:160px;word-break:break-word">\${esc(img.currentAlt||'—')}</td>
+      <td style="font-size:11px;color:#999;max-width:160px;word-break:break-word">\${esc(currentFilename)}</td>
+      <td><input class="seo-inp" type="text" value="\${esc(suggested)}" data-ext="\${ext}" data-original="\${esc(currentFilename)}" id="img-rn-\${idx}" style="font-size:11px"></td>
+      <td class="td-act"><button class="btn-ap on" id="img-rn-ba-\${idx}" onclick="applyOneRename(\${idx},this)">Aplicar</button></td>
+    \`;
+    tbody.appendChild(tr);
+  });
+  const sec = document.getElementById('img-rename-results');
+  sec.style.display = 'block';
+  document.getElementById('img-results').style.display = 'none';
+  sec.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+async function applyOneRename(idx, btn) {
+  const img = renameItems[idx]; if (!img) return;
+  const inp = document.getElementById('img-rn-'+idx);
+  const newFilename = (inp?.value||'').trim();
+  const currentFilename = inp?.dataset.original || (img.url||'').split('?')[0].split('/').pop();
+  if (!newFilename || newFilename === currentFilename) { btn.textContent='Sin cambios'; btn.disabled=true; return; }
+  btn.disabled=true; btn.textContent='Renombrando…';
+  try {
+    const res = await fetch('/api/image/rename',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({productGid:img.productGid,imageUrl:img.url,newFilename,altText:img.currentAlt||''})}).then(r=>r.json());
+    if (res.error) { btn.textContent='Error: '+res.error.slice(0,40); btn.classList.add('btn-rj'); btn.classList.remove('btn-ap','on'); btn.disabled=false; return; }
+    btn.textContent='✓ Listo'; btn.classList.add('on'); btn.disabled=true;
+  } catch(e) { btn.textContent='Error'; btn.disabled=false; }
+}
+
+async function applyAllRenames() {
+  const applyBtn = document.getElementById('img-rename-apply-btn');
+  const msgEl = document.getElementById('img-rename-msg');
+  applyBtn.disabled=true;
+  let ok=0, skip=0, errors=0;
+  for (let idx=0; idx<renameItems.length; idx++) {
+    const img = renameItems[idx];
+    const inp = document.getElementById('img-rn-'+idx);
+    const btn = document.getElementById('img-rn-ba-'+idx);
+    if (btn?.disabled) { skip++; continue; }
+    const newFilename = (inp?.value||'').trim();
+    const currentFilename = inp?.dataset.original || (img.url||'').split('?')[0].split('/').pop();
+    if (!newFilename || newFilename === currentFilename) { skip++; if(btn){btn.textContent='Sin cambios';btn.disabled=true;} continue; }
+    if(btn){btn.disabled=true;btn.textContent='Renombrando…';}
+    applyBtn.textContent=\`Renombrando \${idx+1}/\${renameItems.length}…\`;
+    try {
+      const res = await fetch('/api/image/rename',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({productGid:img.productGid,imageUrl:img.url,newFilename,altText:img.currentAlt||''})}).then(r=>r.json());
+      if (res.error) { errors++; if(btn){btn.textContent='Error';btn.classList.add('btn-rj');btn.classList.remove('btn-ap','on');btn.disabled=false;} }
+      else { ok++; if(btn){btn.textContent='✓ Listo';btn.classList.add('on');btn.disabled=true;} }
+    } catch { errors++; if(btn){btn.textContent='Error';btn.disabled=false;} }
+  }
+  msgEl.className='msg '+(errors?'err':'ok');
+  msgEl.textContent=ok+' renombrada(s)'+(skip?' ('+skip+' sin cambios)':'')+( errors?' — '+errors+' error(es)':'')+ '.';
+  msgEl.style.display='block';
   applyBtn.textContent='Aplicar todos'; applyBtn.disabled=false;
 }
 
