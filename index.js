@@ -1348,13 +1348,14 @@ function renderImgTable() {
   else if (metaFilter==='incomplete') items=items.filter(i=>!i.currentAlt);
   const list=document.getElementById('img-list');
   if(!items.length){list.innerHTML='<p class="empty-msg">No hay imágenes en este filtro.</p>';afterSelChange('img');return;}
-  list.innerHTML=\`<table class="tbl"><thead><tr><th style="width:30px"></th><th>Imagen</th><th>Producto</th><th style="width:36px;text-align:center">Alt</th></tr></thead><tbody>
-    \${items.map(img=>\`<tr onclick="toggleRow(this,'img')">
+  list.innerHTML=\`<table class="tbl"><thead><tr><th style="width:30px"></th><th style="width:46px">Imagen</th><th>Producto</th><th>Alt actual</th><th>Archivo actual</th></tr></thead><tbody>
+    \${items.map(img=>{const fname=(img.url||'').split('?')[0].split('/').pop();return\`<tr onclick="toggleRow(this,'img')">
       <td><input type="checkbox" name="img_item" value="\${img.id}" data-obj='\${esc(JSON.stringify(img))}' onchange="afterSelChange('img');event.stopPropagation()"></td>
       <td><img src="\${esc(img.url)}" class="thumb" loading="lazy"></td>
       <td>\${esc(img.productTitle)}</td>
-      <td class="\${img.currentAlt?'meta-ok':'meta-no'}" style="text-align:center">\${img.currentAlt?'✓':'✗'}</td>
-    </tr>\`).join('')}
+      <td class="\${img.currentAlt?'':'meta-no'}" style="font-size:11px;color:#666;max-width:200px;word-break:break-word">\${esc(img.currentAlt||'—')}</td>
+      <td style="font-size:11px;color:#888;max-width:180px;word-break:break-word">\${esc(fname)}</td>
+    </tr>\`;}).join('')}
   </tbody></table>\`;
   document.getElementById('img-selall').style.display='block';
   document.getElementById('img-sel-noseo').style.display='block';
