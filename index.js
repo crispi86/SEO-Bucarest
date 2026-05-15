@@ -752,8 +752,16 @@ function adminUI(host) {
     <div id="imgf-pending" class="filter-panel"><p style="font-size:12px;color:#888;margin:0">Imágenes creadas en los últimos 90 días sin alt text.</p></div>
     <div id="img-loading" class="empty-msg" style="display:none">Cargando imágenes…</div>
     <div id="img-meta-filter" style="display:none;margin:10px 0 4px;padding-top:10px;border-top:1px solid #f0ece6">
-      <div style="font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:#aaa;margin-bottom:6px">Alt text</div>
-      <div class="seo-filter"><button class="seo-filter-btn active" data-mf="all" onclick="setMetaFilter('images','all',this)">Todos</button><button class="seo-filter-btn" data-mf="incomplete" onclick="setMetaFilter('images','incomplete',this)">Sin alt</button><button class="seo-filter-btn" data-mf="complete" onclick="setMetaFilter('images','complete',this)">Con alt</button></div>
+      <div style="display:flex;gap:24px;flex-wrap:wrap">
+        <div>
+          <div style="font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:#aaa;margin-bottom:6px">Alt text</div>
+          <div class="seo-filter"><button class="seo-filter-btn active" data-mf="all" onclick="setMetaFilter('images','all',this)">Todos</button><button class="seo-filter-btn" data-mf="incomplete" onclick="setMetaFilter('images','incomplete',this)">Sin alt</button><button class="seo-filter-btn" data-mf="complete" onclick="setMetaFilter('images','complete',this)">Con alt</button></div>
+        </div>
+        <div>
+          <div style="font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:#aaa;margin-bottom:6px">Nombre de archivo</div>
+          <div class="seo-filter"><button class="seo-filter-btn active" data-ff="all" onclick="setFilenameFilter('all',this)">Todos</button><button class="seo-filter-btn" data-ff="generic" onclick="setFilenameFilter('generic',this)">Nombre genérico</button><button class="seo-filter-btn" data-ff="seo" onclick="setFilenameFilter('seo',this)">Nombre SEO</button></div>
+        </div>
+      </div>
     </div>
     <div id="img-list"></div>
     <div class="sel-row"><span class="sel-count" id="img-count"></span><div style="display:flex;gap:8px"><button class="sel-all-btn" id="img-sel-noseo" onclick="selWithoutSEO('img')" style="display:none">Selec. sin SEO</button><button class="sel-all-btn" id="img-selall" onclick="selAll('img')" style="display:none">Seleccionar todas</button></div></div>
@@ -883,7 +891,7 @@ const sections = {
   collections: { prefix:'c',   items:[], results:[], seoFilter:'all', metaFilter:'all' },
   metaobjects: { prefix:'mo',  items:[], results:[], seoFilter:'all', metaFilter:'all' },
   articles:    { prefix:'art', items:[], results:[], seoFilter:'all', metaFilter:'all' },
-  images:      { prefix:'img', items:[], results:[], seoFilter:'all', metaFilter:'all' },
+  images:      { prefix:'img', items:[], results:[], seoFilter:'all', metaFilter:'all', filenameFilter:'all' },
 };
 let changedUrlIds = { products:new Set(), collections:new Set() };
 let pFilterType = 'collection';
@@ -1320,8 +1328,9 @@ function setImgF(type, btn) {
   document.querySelectorAll('#imgf-filters .filter-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
   document.querySelectorAll('[id^="imgf-"]').forEach(p=>p.classList.remove('active'));
   document.getElementById('imgf-'+type).classList.add('active');
-  sections.images.items=[]; document.getElementById('img-list').innerHTML=''; document.getElementById('img-count').textContent=''; document.getElementById('img-selall').style.display='none';
+  sections.images.items=[]; sections.images.filenameFilter='all'; document.getElementById('img-list').innerHTML=''; document.getElementById('img-count').textContent=''; document.getElementById('img-selall').style.display='none';
   document.getElementById('img-sel-noseo').style.display='none';
+  document.querySelectorAll('[data-ff]').forEach(b=>{b.classList.toggle('active',b.dataset.ff==='all');});
   const isPending = type === 'pending';
   document.getElementById('img-seo-filter-top').style.display = isPending ? 'none' : 'flex';
   document.getElementById('img-gen-area').style.display = isPending ? 'none' : 'block';
@@ -1340,12 +1349,29 @@ async function loadImages() {
   catch(e){load.style.display='none';}
 }
 
+function isGenericFilename(url) {
+  const name=(url||'').split('?')[0].split('/').pop().replace(/\.[^.]+$/,'');
+  if(!name) return true;
+  if(/\d{7,}/.test(name)) return true;
+  const words=name.split(/[-_\s]+/).filter(p=>/^[a-záéíóúüñ]{3,}$/i.test(p));
+  return words.length < 2;
+}
+
+function setFilenameFilter(val, btn) {
+  sections.images.filenameFilter=val;
+  document.querySelectorAll('[data-ff]').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderImgTable();
+}
+
 function renderImgTable() {
-  const {metaFilter}=sections.images;
+  const {metaFilter, filenameFilter}=sections.images;
   const mf=document.getElementById('img-meta-filter'); if(mf) mf.style.display=sections.images.items.length?'block':'none';
   let items=sections.images.items;
   if (metaFilter==='complete')   items=items.filter(i=>i.currentAlt);
   else if (metaFilter==='incomplete') items=items.filter(i=>!i.currentAlt);
+  if (filenameFilter==='generic') items=items.filter(i=>isGenericFilename(i.url));
+  else if (filenameFilter==='seo') items=items.filter(i=>!isGenericFilename(i.url));
   const list=document.getElementById('img-list');
   if(!items.length){list.innerHTML='<p class="empty-msg">No hay imágenes en este filtro.</p>';afterSelChange('img');return;}
   list.innerHTML=\`<table class="tbl"><thead><tr><th style="width:30px"></th><th style="width:46px">Imagen</th><th>Producto</th><th>Alt actual</th><th>Archivo actual</th></tr></thead><tbody>
