@@ -496,7 +496,6 @@ function adminUI(host) {
 <body>
 <div class="sidebar">
   <div class="sidebar-logo">Bucarest SEO</div>
-  <button class="nav-btn" id="nav-pending" onclick="showPage('pending',this)" style="position:relative"><span class="nav-dot"></span>Pendientes<span id="pending-badge" style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);background:#c0392b;color:#fff;font-size:9px;font-weight:bold;border-radius:8px;padding:1px 5px;min-width:14px;text-align:center"></span></button>
   <button class="nav-btn active" onclick="showPage('products',this)"><span class="nav-dot"></span>Productos</button>
   <button class="nav-btn" onclick="showPage('collections',this)"><span class="nav-dot"></span>Colecciones</button>
   <button class="nav-btn" onclick="showPage('metaobjects',this)"><span class="nav-dot"></span>Metaobjetos</button>
@@ -518,6 +517,7 @@ function adminUI(host) {
       <button class="filter-btn active" onclick="setPF('collection',this)">Por colección</button>
       <button class="filter-btn" onclick="setPF('tag',this)">Por tag</button>
       <button class="filter-btn" onclick="setPF('title',this)">Por título</button>
+      <button class="filter-btn" onclick="setPF('pending',this)" style="border-color:#c0392b;color:#c0392b">Sin SEO recientes</button>
       <span style="color:#e8e2d9;margin:0 4px;align-self:center">|</span>
       <div id="p-seo-filter-top" style="display:flex;gap:6px;align-items:center">
         <button class="seo-filter-btn active" data-f="all" onclick="setPSeoFilter('all',this)">Todos</button>
@@ -528,6 +528,7 @@ function adminUI(host) {
     <div id="pf-collection" class="filter-panel active"><label>Colección<select id="p-col" onchange="loadProducts()"><option value="">Seleccione…</option></select></label></div>
     <div id="pf-tag" class="filter-panel"><label>Tag<input id="p-tag" placeholder="Ej: pintura" oninput="debounce(loadProducts,600)"></label></div>
     <div id="pf-title" class="filter-panel"><label>Título contiene<input id="p-title" placeholder="Ej: silla" oninput="debounce(loadProducts,600)"></label></div>
+    <div id="pf-pending" class="filter-panel"><p style="font-size:12px;color:#888;margin:6px 0 0">Productos creados en los últimos 90 días sin meta título. Usa los filtros de estado y existencias para afinar.</p></div>
     <div id="p-loading" class="empty-msg" style="display:none">Cargando…</div>
     <div id="p-painting-badge"  style="display:none;margin:8px 0;padding:7px 12px;background:#fdf8f0;border:1px solid #e8d8b0;color:#7a5c1a;font-size:11px;letter-spacing:0.04em">🎨 Colección de pinturas detectada — se usará lógica especializada para metatítulos y metadescripciones.</div>
     <div id="p-furniture-badge" style="display:none;margin:8px 0;padding:7px 12px;background:#f5f0eb;border:1px solid #d8c8b0;color:#5a3e1a;font-size:11px;letter-spacing:0.04em">🪑 Colección de muebles detectada — el metatítulo incluirá antigüedad, material y origen.</div>
@@ -719,6 +720,7 @@ function adminUI(host) {
       <button class="filter-btn active" onclick="setImgF('collection',this)">Por colección</button>
       <button class="filter-btn" onclick="setImgF('tag',this)">Por tag</button>
       <button class="filter-btn" onclick="setImgF('title',this)">Por título</button>
+      <button class="filter-btn" onclick="setImgF('pending',this)" style="border-color:#c0392b;color:#c0392b">Sin alt recientes</button>
       <span style="color:#e8e2d9;margin:0 4px;align-self:center">|</span>
       <div id="img-seo-filter-top" style="display:flex;gap:6px;align-items:center">
         <button class="seo-filter-btn active" data-f="all" onclick="setSeoFilter('images','all',this)">Todos</button>
@@ -729,6 +731,7 @@ function adminUI(host) {
     <div id="imgf-collection" class="filter-panel active"><label>Colección<select id="img-col" onchange="loadImages()"><option value="">Seleccione…</option></select></label></div>
     <div id="imgf-tag" class="filter-panel"><label>Tag<input id="img-tag" placeholder="Ej: pintura" oninput="debounce(loadImages,600)"></label></div>
     <div id="imgf-title" class="filter-panel"><label>Título<input id="img-title" placeholder="Ej: óleo" oninput="debounce(loadImages,600)"></label></div>
+    <div id="imgf-pending" class="filter-panel"><p style="font-size:12px;color:#888;margin:0">Imágenes creadas en los últimos 90 días sin alt text.</p></div>
     <div id="img-loading" class="empty-msg" style="display:none">Cargando imágenes…</div>
     <div id="img-meta-filter" style="display:none;margin:10px 0 4px;padding-top:10px;border-top:1px solid #f0ece6">
       <div style="font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:#aaa;margin-bottom:6px">Alt text</div>
@@ -737,64 +740,26 @@ function adminUI(host) {
     <div id="img-list"></div>
     <div class="sel-row"><span class="sel-count" id="img-count"></span><div style="display:flex;gap:8px"><button class="sel-all-btn" id="img-sel-noseo" onclick="selWithoutSEO('img')" style="display:none">Selec. sin SEO</button><button class="sel-all-btn" id="img-selall" onclick="selAll('img')" style="display:none">Seleccionar todas</button></div></div>
   </div>
-  <div style="margin-top:14px">
-    <label style="font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:#9a7f5a;display:block;margin-bottom:5px">Instrucción puntual para esta generación <span style="opacity:0.5;font-size:9px;text-transform:none;letter-spacing:0">(opcional — no se guarda)</span></label>
-    <textarea id="img-one-time-rules" rows="2" style="width:100%;padding:8px 12px;border:1px solid #ddd6cc;background:#fdfcfb;font-size:12px;font-family:inherit;outline:none;color:#1a1a1a;resize:vertical;transition:border-color 0.2s" placeholder="Ej: Son detalles de marquetería, describir la técnica."></textarea>
-  </div>
-  <div class="btn-row">
-    <button class="btn btn-primary" id="img-gen-btn" onclick="startGen('images')" disabled>Generar alt text con Claude</button>
-    <span class="btn-hint" id="img-hint">Seleccione imágenes</span>
-  </div>
-  <div class="progress-wrap" id="img-prog"><div class="progress-bar"><div class="progress-fill" id="img-pfill"></div></div><div class="progress-lbl" id="img-plbl"></div></div>
-  <div class="results-section" id="img-results">
-    <h2>Alt text propuesto</h2><p class="results-subtitle" id="img-rsub"></p>
-    <div class="results-wrap"><table class="rtbl"><thead><tr><th>Imagen</th><th>Producto</th><th>Alt actual</th><th style="min-width:220px">Alt propuesto <span style="opacity:0.4;font-size:8px">≤120</span></th><th>Acción</th></tr></thead><tbody id="img-rtbody"></tbody></table></div>
-    <div class="apply-bar"><span class="apply-count" id="img-acount">0 aprobadas</span><button class="btn btn-primary" id="img-apply-btn" onclick="applyAll('images')" disabled>Aplicar todos</button><div id="img-apply-msg"></div></div>
-  </div>
-  <div id="img-msg"></div>
-</div>
-
-<!-- PENDIENTES -->
-<div class="page" id="page-pending">
-  <h1>Pendientes</h1>
-  <p class="subtitle">Contenido reciente sin optimización SEO.</p>
-  <div class="seo-filter" style="margin-bottom:16px">
-    <button class="seo-filter-btn active" id="pend-tab-btn-products" onclick="showPendingTab('products',this)">Productos sin SEO</button>
-    <button class="seo-filter-btn" id="pend-tab-btn-images" onclick="showPendingTab('images',this)">Imágenes sin alt text</button>
-  </div>
-
-  <!-- ── TAB PRODUCTOS ── -->
-  <div id="pend-tab-products">
-    <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
-        <span id="pend-count" style="font-size:12px;color:#888"></span>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-primary" id="pend-gen-btn" onclick="generatePendingSEO()" disabled>Generar SEO</button>
-          <button class="btn" onclick="clearPending()" style="font-size:12px;color:#999;background:none;border:1px solid #ddd6cc">Limpiar lista</button>
-        </div>
-      </div>
-      <div id="pend-list"><p class="empty-msg">Cargando…</p></div>
-      <div id="pend-prog" style="display:none;margin-top:14px">
-        <div style="height:4px;background:#eee;border-radius:2px"><div id="pend-pfill" style="height:4px;background:#9a7f5a;border-radius:2px;width:0;transition:width 0.3s"></div></div>
-        <div id="pend-plbl" style="font-size:11px;color:#888;margin-top:6px"></div>
-      </div>
+  <div id="img-gen-area">
+    <div style="margin-top:14px">
+      <label style="font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:#9a7f5a;display:block;margin-bottom:5px">Instrucción puntual para esta generación <span style="opacity:0.5;font-size:9px;text-transform:none;letter-spacing:0">(opcional — no se guarda)</span></label>
+      <textarea id="img-one-time-rules" rows="2" style="width:100%;padding:8px 12px;border:1px solid #ddd6cc;background:#fdfcfb;font-size:12px;font-family:inherit;outline:none;color:#1a1a1a;resize:vertical;transition:border-color 0.2s" placeholder="Ej: Son detalles de marquetería, describir la técnica."></textarea>
     </div>
-    <div class="results-section" id="pend-results">
-      <h2>Propuestas generadas</h2>
-      <p class="subtitle" id="pend-rsub"></p>
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-        <span id="pend-acount" style="font-size:13px;color:#666"></span>
-        <button class="btn btn-primary" id="pend-apply-btn" onclick="applyPendingSEO()" disabled>Aplicar todos</button>
-        <span id="pend-apply-msg" class="msg" style="display:none"></span>
-      </div>
-      <div class="results-wrap"><table class="rtbl"><thead><tr><th>Producto</th><th>Meta título actual</th><th style="min-width:200px">Meta título propuesto <span style="opacity:0.4;font-size:8px">≤60</span></th><th style="min-width:260px">Meta descripción propuesta <span style="opacity:0.4;font-size:8px">≤160</span></th><th>Acción</th></tr></thead><tbody id="pend-rtbody"></tbody></table></div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="img-gen-btn" onclick="startGen('images')" disabled>Generar alt text con Claude</button>
+      <span class="btn-hint" id="img-hint">Seleccione imágenes</span>
     </div>
-    <div id="pend-msg"></div>
+    <div class="progress-wrap" id="img-prog"><div class="progress-bar"><div class="progress-fill" id="img-pfill"></div></div><div class="progress-lbl" id="img-plbl"></div></div>
+    <div class="results-section" id="img-results">
+      <h2>Alt text propuesto</h2><p class="results-subtitle" id="img-rsub"></p>
+      <div class="results-wrap"><table class="rtbl"><thead><tr><th>Imagen</th><th>Producto</th><th>Alt actual</th><th style="min-width:220px">Alt propuesto <span style="opacity:0.4;font-size:8px">≤120</span></th><th>Acción</th></tr></thead><tbody id="img-rtbody"></tbody></table></div>
+      <div class="apply-bar"><span class="apply-count" id="img-acount">0 aprobadas</span><button class="btn btn-primary" id="img-apply-btn" onclick="applyAll('images')" disabled>Aplicar todos</button><div id="img-apply-msg"></div></div>
+    </div>
+    <div id="img-msg"></div>
   </div>
-
-  <!-- ── TAB IMÁGENES ── -->
-  <div id="pend-tab-images" style="display:none">
-    <div class="card">
+  <!-- Pending images area (visible when imgf-pending is active) -->
+  <div id="img-pending-area" style="display:none">
+    <div class="card" style="margin-top:14px">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
         <span id="pend-img-count" style="font-size:12px;color:#888"></span>
         <div style="display:flex;gap:8px">
@@ -917,7 +882,6 @@ const FURNITURE_COLLECTIONS = [
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
   const cols = await fetch('/api/collections').then(r=>r.json());
-  loadPendingBadge();
   ['p-col','img-col'].forEach(id => {
     const sel = document.getElementById(id);
     cols.forEach(c => { const o = document.createElement('option'); o.value=c.id; o.textContent=c.title; sel.appendChild(o); });
@@ -933,7 +897,6 @@ function showPage(name, btn) {
   if (name==='history') loadHistory();
   if (name==='metaobjects') loadMetaobjectTypes();
   if (name==='config') loadConfig();
-  if (name==='pending') loadPending();
 }
 
 // ── Shared utils ──────────────────────────────────────────────────────────────
@@ -1022,11 +985,12 @@ function setPF(type, btn) {
   document.querySelectorAll('#pf-filters .filter-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
   document.querySelectorAll('[id^="pf-"]').forEach(p=>p.classList.remove('active'));
   document.getElementById('pf-'+type).classList.add('active');
-  sections.products.items=[]; sections.products.seoFilter='all'; sections.products.metaFilter='all'; sections.products.statusFilter='all'; sections.products.stockFilter='all'; sections.products.isPainting=false; sections.products.isFurniture=false;
+  sections.products.items=[]; sections.products.seoFilter='all'; sections.products.metaFilter='all'; sections.products.statusFilter='all'; sections.products.stockFilter='all'; sections.products.urlFilter='all'; sections.products.descFilter='all'; sections.products.isPainting=false; sections.products.isFurniture=false;
   document.getElementById('p-list').innerHTML=''; document.getElementById('p-count').textContent=''; document.getElementById('p-selall').style.display='none'; document.getElementById('p-sel-noseo').style.display='none'; document.getElementById('p-extra-filters').style.display='none'; document.getElementById('p-painting-badge').style.display='none'; document.getElementById('p-furniture-badge').style.display='none';
   document.querySelectorAll('#p-seo-filter .seo-filter-btn, #p-seo-filter-top .seo-filter-btn').forEach(b => b.classList.toggle('active', b.dataset.f === 'all'));
   ['p-status-filter','p-stock-filter'].forEach(id => document.querySelectorAll('#'+id+' .seo-filter-btn').forEach((b,i)=>{b.classList.toggle('active',i===0);}));
   afterSelChange('p');
+  if (type === 'pending') loadProducts();
 }
 
 function setPSeoFilter(f, btn) {
@@ -1075,31 +1039,37 @@ function setPUrlFilter(f, btn) {
 async function loadProducts() {
   const load = document.getElementById('p-loading');
   load.style.display='block'; document.getElementById('p-list').innerHTML=''; sections.products.items=[];
-  let baseUrl='/api/products?limit=50&';
-  if(pFilterType==='collection'){const v=document.getElementById('p-col').value;if(!v){load.style.display='none';return;}baseUrl+='collection_id='+v;}
-  else if(pFilterType==='tag'){const v=document.getElementById('p-tag').value.trim();if(!v){load.style.display='none';return;}baseUrl+='tag='+encodeURIComponent(v);}
-  else if(pFilterType==='title'){const v=document.getElementById('p-title').value.trim();if(!v){load.style.display='none';return;}baseUrl+='title='+encodeURIComponent(v);}
+  sections.products.isPainting = false; sections.products.isFurniture = false;
+  document.getElementById('p-painting-badge').style.display='none';
+  document.getElementById('p-furniture-badge').style.display='none';
   try {
-    let all=[], cursor=null;
-    do {
-      const url = cursor ? baseUrl+'&after='+encodeURIComponent(cursor) : baseUrl;
-      const d = await fetch(url).then(r=>r.json());
-      all = all.concat(d.products||[]);
-      load.textContent = 'Cargando… '+all.length+' productos';
-      cursor = d.pageInfo?.hasNextPage ? d.pageInfo.endCursor : null;
-    } while(cursor);
-    sections.products.items=all; load.style.display='none'; load.textContent='Cargando…';
-    sections.products.isPainting = false; sections.products.isFurniture = false;
-    const paintingBadge  = document.getElementById('p-painting-badge');
-    const furnitureBadge = document.getElementById('p-furniture-badge');
-    if (pFilterType === 'collection') {
-      const sel = document.getElementById('p-col');
-      const colName = (sel.options[sel.selectedIndex]?.textContent || '').toLowerCase().trim();
-      sections.products.isPainting  = PAINTING_COLLECTIONS.some(n => colName.includes(n));
-      sections.products.isFurniture = FURNITURE_COLLECTIONS.some(n => colName.includes(n));
+    let all=[];
+    if (pFilterType === 'pending') {
+      load.textContent = 'Consultando Shopify…';
+      all = await fetch('/api/products/pending').then(r=>r.json());
+    } else {
+      let baseUrl='/api/products?limit=50&';
+      if(pFilterType==='collection'){const v=document.getElementById('p-col').value;if(!v){load.style.display='none';load.textContent='Cargando…';return;}baseUrl+='collection_id='+v;}
+      else if(pFilterType==='tag'){const v=document.getElementById('p-tag').value.trim();if(!v){load.style.display='none';load.textContent='Cargando…';return;}baseUrl+='tag='+encodeURIComponent(v);}
+      else if(pFilterType==='title'){const v=document.getElementById('p-title').value.trim();if(!v){load.style.display='none';load.textContent='Cargando…';return;}baseUrl+='title='+encodeURIComponent(v);}
+      let cursor=null;
+      do {
+        const url = cursor ? baseUrl+'&after='+encodeURIComponent(cursor) : baseUrl;
+        const d = await fetch(url).then(r=>r.json());
+        all = all.concat(d.products||[]);
+        load.textContent = 'Cargando… '+all.length+' productos';
+        cursor = d.pageInfo?.hasNextPage ? d.pageInfo.endCursor : null;
+      } while(cursor);
+      if (pFilterType === 'collection') {
+        const sel = document.getElementById('p-col');
+        const colName = (sel.options[sel.selectedIndex]?.textContent || '').toLowerCase().trim();
+        sections.products.isPainting  = PAINTING_COLLECTIONS.some(n => colName.includes(n));
+        sections.products.isFurniture = FURNITURE_COLLECTIONS.some(n => colName.includes(n));
+      }
+      document.getElementById('p-painting-badge').style.display  = sections.products.isPainting  ? 'block' : 'none';
+      document.getElementById('p-furniture-badge').style.display  = sections.products.isFurniture ? 'block' : 'none';
     }
-    if (paintingBadge)  paintingBadge.style.display  = sections.products.isPainting  ? 'block' : 'none';
-    if (furnitureBadge) furnitureBadge.style.display  = sections.products.isFurniture ? 'block' : 'none';
+    sections.products.items=all; load.style.display='none'; load.textContent='Cargando…';
     renderProductTable(sections.products.items);
   } catch(e){load.style.display='none';load.textContent='Cargando…';document.getElementById('p-list').innerHTML='<p class="empty-msg">Error cargando productos.</p>';}
 }
@@ -1298,7 +1268,13 @@ function setImgF(type, btn) {
   document.querySelectorAll('[id^="imgf-"]').forEach(p=>p.classList.remove('active'));
   document.getElementById('imgf-'+type).classList.add('active');
   sections.images.items=[]; document.getElementById('img-list').innerHTML=''; document.getElementById('img-count').textContent=''; document.getElementById('img-selall').style.display='none';
+  document.getElementById('img-sel-noseo').style.display='none';
+  const isPending = type === 'pending';
+  document.getElementById('img-seo-filter-top').style.display = isPending ? 'none' : 'flex';
+  document.getElementById('img-gen-area').style.display = isPending ? 'none' : 'block';
+  document.getElementById('img-pending-area').style.display = isPending ? 'block' : 'none';
   afterSelChange('img');
+  if (isPending) loadPendingImages();
 }
 
 async function loadImages() {
@@ -1823,39 +1799,9 @@ function applyResearch() {
   if (resBtn) { resBtn.classList.add('active-research'); resBtn.title = terms.length+' término(s) aplicado(s)'; }
 }
 
-// ── Pending ───────────────────────────────────────────────────────────────────
-let pendingItems = [];
-let pendingResults = [];
+// ── Pending Images ────────────────────────────────────────────────────────────
 let pendingImages = [];
 let pendingImgResults = [];
-
-async function loadPendingBadge() {
-  try {
-    const data = await fetch('/api/products/pending').then(r=>r.json());
-    const badge = document.getElementById('pending-badge');
-    if (badge) { badge.textContent = data.length; badge.style.display = data.length ? 'inline-block' : 'none'; }
-  } catch(e) {}
-}
-
-function showPendingTab(tab, btn) {
-  ['products','images'].forEach(t => {
-    document.getElementById('pend-tab-'+t).style.display = t===tab ? 'block' : 'none';
-    document.getElementById('pend-tab-btn-'+t).classList.toggle('active', t===tab);
-  });
-  if (tab==='images' && !pendingImages.length) loadPendingImages();
-}
-
-async function loadPending() {
-  document.getElementById('pend-list').innerHTML='<p class="empty-msg">Consultando Shopify…</p>';
-  try {
-    pendingItems = await fetch('/api/products/pending').then(r=>r.json());
-    renderPendingTable();
-    const badge = document.getElementById('pending-badge');
-    if (badge) { badge.textContent = pendingItems.length; badge.style.display = pendingItems.length ? 'inline-block' : 'none'; }
-  } catch(e) {
-    document.getElementById('pend-list').innerHTML='<p class="empty-msg">Error cargando pendientes.</p>';
-  }
-}
 
 async function loadPendingImages() {
   document.getElementById('pend-img-list').innerHTML='<p class="empty-msg">Consultando Shopify…</p>';
@@ -1865,161 +1811,6 @@ async function loadPendingImages() {
   } catch(e) {
     document.getElementById('pend-img-list').innerHTML='<p class="empty-msg">Error cargando imágenes.</p>';
   }
-}
-
-function renderPendingTable() {
-  const list = document.getElementById('pend-list');
-  const countEl = document.getElementById('pend-count');
-  const genBtn = document.getElementById('pend-gen-btn');
-  if (!pendingItems.length) {
-    list.innerHTML='<p class="empty-msg">No hay productos sin SEO en los últimos 90 días.</p>';
-    if (countEl) countEl.textContent='';
-    if (genBtn) genBtn.disabled=true;
-    return;
-  }
-  if (countEl) countEl.textContent = pendingItems.length+' producto(s) sin SEO';
-  if (genBtn) genBtn.disabled=false;
-  list.innerHTML=\`<table class="tbl"><thead><tr><th style="width:30px"></th><th>Título</th><th>SKU</th><th>Estado</th><th style="width:32px"></th></tr></thead><tbody>
-    \${pendingItems.map((p,i)=>\`<tr onclick="togglePendingRow(\${i})">
-      <td><input type="checkbox" name="pend_item" value="\${p.id}" data-idx="\${i}" checked onchange="updatePendingCount();event.stopPropagation()"></td>
-      <td>\${esc(p.title)}</td>
-      <td style="color:#aaa">\${esc(p.sku||'—')}</td>
-      <td><span class="status-badge \${p.status==='active'?'s-active':'s-draft'}">\${p.status==='active'?'Activo':'Borrador'}</span></td>
-      <td><button onclick="dismissPending('\${p.id}');event.stopPropagation()" style="background:none;border:none;color:#bbb;cursor:pointer;font-size:14px;padding:2px 4px" title="Ignorar esta vez">✕</button></td>
-    </tr>\`).join('')}
-  </tbody></table>\`;
-  updatePendingCount();
-}
-
-function togglePendingRow(idx) {
-  const cb = document.querySelector('[name="pend_item"][data-idx="'+idx+'"]');
-  if (cb) { cb.checked=!cb.checked; updatePendingCount(); }
-}
-
-function updatePendingCount() {
-  const n = document.querySelectorAll('[name="pend_item"]:checked').length;
-  const genBtn = document.getElementById('pend-gen-btn');
-  if (genBtn) genBtn.disabled = !n;
-}
-
-function dismissPending(id) {
-  pendingItems = pendingItems.filter(p=>p.id!==id);
-  renderPendingTable();
-  const badge = document.getElementById('pending-badge');
-  if (badge) { badge.textContent=pendingItems.length; badge.style.display=pendingItems.length?'inline-block':'none'; }
-}
-
-function clearPending() {
-  if (!confirm('¿Limpiar la lista? Se recargará desde Shopify la próxima vez.')) return;
-  pendingItems=[];
-  renderPendingTable();
-  const badge=document.getElementById('pending-badge');
-  if (badge) badge.style.display='none';
-}
-
-async function generatePendingSEO() {
-  const checked = Array.from(document.querySelectorAll('[name="pend_item"]:checked'));
-  const items = checked.map(cb => pendingItems[parseInt(cb.dataset.idx)]).filter(Boolean);
-  if (!items.length) return;
-
-  pendingResults = [];
-  document.getElementById('pend-rtbody').innerHTML='';
-  document.getElementById('pend-results').style.display='none';
-  document.getElementById('pend-prog').style.display='block';
-  document.getElementById('pend-gen-btn').disabled=true;
-
-  const BATCH=20; const total=items.length; let done=0;
-  for (let b=0; b<items.length; b+=BATCH) {
-    const chunk=items.slice(b,b+BATCH);
-    const ok=await runPendingChunk(chunk, done, total);
-    if (!ok) return;
-    done+=chunk.length;
-  }
-
-  document.getElementById('pend-prog').style.display='none';
-  document.getElementById('pend-gen-btn').disabled=false;
-  const n=pendingResults.length;
-  const sec=document.getElementById('pend-results'); sec.style.display='block';
-  document.getElementById('pend-rsub').textContent=n+' propuesta(s) generada(s). Revisa y edita antes de aplicar.';
-  updatePendingApplyCount();
-  sec.scrollIntoView({behavior:'smooth',block:'start'});
-}
-
-function runPendingChunk(items, offset, total) {
-  return new Promise(async resolve => {
-    try {
-      const {jobId} = await fetch('/api/seo/queue',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'products',items})}).then(r=>r.json());
-      const es = new EventSource('/api/seo/stream/'+jobId);
-      es.onmessage = e => {
-        const data=JSON.parse(e.data);
-        if (data.done) { es.close(); resolve(true); return; }
-        document.getElementById('pend-pfill').style.width=Math.round((offset+data.index)/total*100)+'%';
-        document.getElementById('pend-plbl').textContent='Procesando '+(offset+data.index)+' de '+total+'…';
-        if (!data.error) { pendingResults.push({...data, approved:true}); appendPendingResult(data, pendingResults.length-1); }
-        else { const tr=document.createElement('tr'); tr.innerHTML=\`<td colspan="5" style="color:#c0392b;font-size:11px;padding:8px 12px">Error en "\${esc(data.itemTitle||'?')}": \${esc(data.error)}</td>\`; document.getElementById('pend-rtbody').appendChild(tr); }
-        updatePendingApplyCount();
-      };
-      es.onerror = () => { es.close(); document.getElementById('pend-prog').style.display='none'; document.getElementById('pend-gen-btn').disabled=false; if(pendingResults.length){document.getElementById('pend-results').style.display='block';updatePendingApplyCount();} resolve(false); };
-    } catch(e) { document.getElementById('pend-prog').style.display='none'; document.getElementById('pend-gen-btn').disabled=false; resolve(false); }
-  });
-}
-
-function appendPendingResult(data, idx) {
-  const tbody=document.getElementById('pend-rtbody');
-  const tr=document.createElement('tr'); tr.id='pend-rr-'+idx;
-  tr.innerHTML=\`
-    <td class="td-name">\${esc(data.productTitle)}</td>
-    <td class="td-cur">\${esc(data.currentMetaTitle||'(sin meta título)')}</td>
-    <td><input class="seo-inp" type="text" maxlength="65" value="\${esc(data.metaTitle)}" oninput="charCount(this,60,'pend-ct-\${idx}')" id="pend-ti-\${idx}"><div class="char-c" id="pend-ct-\${idx}"></div></td>
-    <td><textarea class="seo-inp" maxlength="165" rows="3" oninput="charCount(this,160,'pend-cd-\${idx}')" id="pend-di-\${idx}">\${esc(data.metaDescription)}</textarea><div class="char-c" id="pend-cd-\${idx}"></div></td>
-    <td class="td-act"><button class="btn-ap on" id="pend-ba-\${idx}" onclick="applyOnePending(\${idx},this)">Aplicar</button></td>
-  \`;
-  tbody.appendChild(tr);
-  const ti=document.getElementById('pend-ti-'+idx); if(ti) charCount(ti,60,'pend-ct-'+idx);
-  const di=document.getElementById('pend-di-'+idx); if(di) charCount(di,160,'pend-cd-'+idx);
-}
-
-async function applyOnePending(idx, btn) {
-  const r=pendingResults[idx]; if(!r) return;
-  const item={...r, metaTitle:(document.getElementById('pend-ti-'+idx)?.value||r.metaTitle).trim(), metaDescription:(document.getElementById('pend-di-'+idx)?.value||r.metaDescription).trim()};
-  btn.disabled=true; btn.textContent='Guardando…';
-  try {
-    const res=await fetch('/api/seo/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'products',items:[item]})}).then(r=>r.json());
-    if (res.errors?.length) { btn.textContent='Error'; btn.classList.add('btn-rj'); btn.classList.remove('btn-ap','on'); btn.disabled=false; return; }
-    btn.textContent='✓ Aplicado'; btn.disabled=true;
-    res.applied.forEach(a => { pendingItems=pendingItems.filter(p=>p.id!==a.id); });
-    renderPendingTable();
-    const badge=document.getElementById('pending-badge');
-    if (badge) { badge.textContent=pendingItems.length; badge.style.display=pendingItems.length?'inline-block':'none'; }
-  } catch(e) { btn.textContent='Error'; btn.disabled=false; }
-}
-
-function updatePendingApplyCount() {
-  const n=pendingResults.filter(r=>r.approved).length;
-  const el=document.getElementById('pend-acount'); if(el) el.textContent=n+' aprobada(s)';
-  const btn=document.getElementById('pend-apply-btn'); if(btn) btn.disabled=!n;
-}
-
-async function applyPendingSEO() {
-  const toApply=pendingResults
-    .map((r,idx)=>r.approved?{...r, metaTitle:(document.getElementById('pend-ti-'+idx)?.value||r.metaTitle).trim(), metaDescription:(document.getElementById('pend-di-'+idx)?.value||r.metaDescription).trim()}:null)
-    .filter(Boolean);
-  if (!toApply.length) return;
-  const btn=document.getElementById('pend-apply-btn'); btn.disabled=true; btn.textContent='Aplicando…';
-  try {
-    const res=await fetch('/api/seo/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'products',items:toApply})}).then(r=>r.json());
-    const msgEl=document.getElementById('pend-apply-msg');
-    msgEl.className='msg '+(res.errors.length?'err':'ok');
-    msgEl.textContent=res.applied.length+' actualizado(s) en Shopify.'+(res.errors.length?' '+res.errors.length+' error(es).':'');
-    msgEl.style.display='block';
-    res.applied.forEach(a => { pendingItems=pendingItems.filter(p=>p.id!==a.id); });
-    renderPendingTable();
-    const badge=document.getElementById('pending-badge');
-    if (badge) { badge.textContent=pendingItems.length; badge.style.display=pendingItems.length?'inline-block':'none'; }
-    pendingResults=pendingResults.filter(r=>!res.applied.find(a=>a.id===r.productId));
-    updatePendingApplyCount();
-  } catch(e) { document.getElementById('pend-apply-msg').className='msg err'; document.getElementById('pend-apply-msg').textContent='Error: '+e.message; document.getElementById('pend-apply-msg').style.display='block'; }
-  btn.textContent='Aplicar en Shopify'; btn.disabled=false;
 }
 
 // ── Pending Images ─────────────────────────────────────────────────────────────
