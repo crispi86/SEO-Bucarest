@@ -416,6 +416,13 @@ function uploadToStaged(targetUrl, parameters, imageData, mimeType, filename) {
         `--${boundary}\r\nContent-Disposition: form-data; name="${p.name}"\r\n\r\n${p.value}\r\n`
       ));
     }
+    // GCS presigned POST requires Content-Type as an explicit form field
+    const hasContentType = parameters.some(p => p.name.toLowerCase() === 'content-type');
+    if (!hasContentType) {
+      parts.push(Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="Content-Type"\r\n\r\n${mimeType}\r\n`
+      ));
+    }
     // Add the file field last
     parts.push(Buffer.from(
       `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: ${mimeType}\r\n\r\n`
