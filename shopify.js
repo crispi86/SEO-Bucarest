@@ -408,24 +408,35 @@ function fetchImageBytes(url) {
 
 function uploadToStaged(targetUrl, parameters, imageData, mimeType, filename) {
   return new Promise((resolve, reject) => {
-    const boundary = 'FormBoundary' + Date.now().toString(16) + Math.random().toString(16).slice(2);
-    const fieldParts = parameters.map(p =>
-      `--${boundary}\r\nContent-Disposition: form-data; name="${p.name}"\r\n\r\n${p.value}`
-    ).join('\r\n');
-    const fileHeader = `\r\n--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: ${mimeType}\r\n\r\n`;
-    const footer = `\r\n--${boundary}--\r\n`;
-    const body = Buffer.concat([Buffer.from(fieldParts + fileHeader), imageData, Buffer.from(footer)]);
+    const boundary = '----FormBoundary' + Date.now().toString(16) + Math.random().toString(16).slice(2, 10);
+    const parts = [];
+    // Add all parameters from Shopify as form fields (must come before the file)
+    for (const p of parameters) {
+      parts.push(Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="${p.name}"\r\n\r\n${p.value}\r\n`
+      ));
+    }
+    // Add the file field last
+    parts.push(Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: ${mimeType}\r\n\r\n`
+    ));
+    parts.push(imageData);
+    parts.push(Buffer.from(`\r\n--${boundary}--\r\n`));
+    const body = Buffer.concat(parts);
     const parsed = new URL(targetUrl);
+    console.log(`[upload] POST ${parsed.hostname} params=${parameters.map(p=>p.name).join(',')} size=${body.length} file=${filename} mime=${mimeType}`);
     const req = https.request({
       hostname: parsed.hostname, port: parsed.port || 443,
       path: parsed.pathname + parsed.search, method: 'POST',
       headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}`, 'Content-Length': body.length },
     }, res => {
-      let resp = '';
-      res.on('data', c => resp += c);
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
       res.on('end', () => {
-        if (res.statusCode < 300 || res.statusCode === 303) resolve(resp);
-        else reject(new Error(`Upload HTTP ${res.statusCode}: ${resp.slice(0, 200)}`));
+        const resp = Buffer.concat(chunks).toString();
+        console.log(`[upload] response ${res.statusCode}: ${resp.slice(0, 500)}`);
+        if (res.statusCode < 300 || res.statusCode === 303 || res.statusCode === 201) resolve(resp);
+        else reject(new Error(`Upload HTTP ${res.statusCode}: ${resp.slice(0, 500)}`));
       });
     });
     req.on('error', reject);
@@ -464,6 +475,7 @@ async function renameAndUpdateImage(productGid, imageUrl, newFilename, altText) 
   if (errs.length) throw new Error('Staged upload: ' + errs.map(e => e.message).join(', '));
   const target = staged?.data?.stagedUploadsCreate?.stagedTargets?.[0];
   if (!target) throw new Error('No se obtuvo staged target');
+  console.log(`[staged] url=${target.url} resourceUrl=${target.resourceUrl} params=${JSON.stringify(target.parameters)}`);
   await uploadToStaged(target.url, target.parameters, imageData, mimeType, newFilename);
   const createResult = await graphqlRequest(`
     mutation productCreateMedia($productId: ID!, $media: [CreateMediaInput!]!) {
